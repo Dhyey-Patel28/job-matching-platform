@@ -29,3 +29,4 @@ Use any stack. The CI workflow currently just runs a placeholder script so statu
 - CI must pass. Squash-merge with a clean title.
 
 See **CONTRIBUTING.md** for the full policy.
+
