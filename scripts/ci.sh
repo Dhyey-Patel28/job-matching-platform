@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "== CI placeholder =="
-echo "Add your real build & test commands here."
-echo "Examples:"
-echo "  # Node"
-echo "  # npm ci && npm test"
-echo "  # Python"
-echo '  # python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pytest -q'
-echo "------------------------------------------"
+echo "== CI: build frontend =="
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WEB_DIR="${WEB_DIR:-apps/web}"
 
-# Succeed by default (until real tests are added)
-exit 0
+cd "$ROOT_DIR/$WEB_DIR"
+npm ci
+npm run typecheck --if-present
+npm run lint --if-present
+npm run build
+echo "== CI ok =="
