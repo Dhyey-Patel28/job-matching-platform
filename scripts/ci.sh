@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "== CI: build frontend =="
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WEB_DIR="${WEB_DIR:-apps/web}"
+echo "== CI: root install & build (apps/web) =="
 
-cd "$ROOT_DIR/$WEB_DIR"
+# Install once at the repo root using the root package-lock.json
 npm ci
-npm run typecheck --if-present
+
+# Optional checks (won't fail if scripts don't exist)
 npm run lint --if-present
+npm run typecheck --if-present
+
+# Build the web app via root script proxy to apps/web
 npm run build
+
 echo "== CI ok =="

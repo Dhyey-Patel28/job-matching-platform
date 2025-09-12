@@ -12,13 +12,10 @@ A clean starter repo configured for a 6-person class team. It includes:
 Use any stack. The CI workflow currently just runs a placeholder script so status checks pass until you add real tests.
 
 ## Quick Start
-1. **Create repo**
-   ```bash
-   gh repo create your-org/your-repo --public --source=. --remote=origin --push
-   ```
-2. **Add your classmates as collaborators (or use an org team).**
-3. **Create labels & project board** using the commands in `docs/project-setup.md`.
-4. **Protect `main`** (see `docs/branch-protection.md`).
+```bash
+npm install
+npm run dev
+# open http://localhost:3000
 
 ## Workflow (TL;DR)
 - Create an **Issue** for every task.
