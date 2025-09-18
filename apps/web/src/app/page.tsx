@@ -1,49 +1,94 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import JobCard, { type Job } from '@/components/JobCard';
-import EmployerCard, { type Employer } from '@/components/EmployerCard';
-import SwipeDeck, { type SwipeDirection } from '@/components/SwipeDeck';
-import { sampleJobs, sampleEmployers } from '@/data/sample';
+import EmployerCard, { type Employer } from "@/components/EmployerCard";
+import JobCard, { type Job } from "@/components/JobCard";
+import LoginPage from "@/components/LoginPage";
+import SwipeDeck, { type SwipeDirection } from "@/components/SwipeDeck";
+import { sampleEmployers, sampleJobs } from "@/data/sample";
+import { useEffect, useMemo, useState } from "react";
 
-export default function HomePage() {
-  const [tab, setTab] = useState<'jobs' | 'employers'>('jobs');
+export default function Page() {
+  // -----------------------
+  // Login state
+  // -----------------------
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("isAuthenticated");
+    if (token == "true") {
+      setIsLoggedIn(true);
+    }
+    setLoading(false);
+  }, []);
+
+  const handleLogin = (role: string) => {
+    console.log("✅ User logged in as:", role);
+    localStorage.setItem("token", "example-token"); // store session token
+    localStorage.setItem("role", role);
+    setIsLoggedIn(true);
+  };
+
+  // -----------------------
+  // HomePage state
+  // -----------------------
+  const [tab, setTab] = useState<"jobs" | "employers">("jobs");
   const [lastAction, setLastAction] = useState<string | null>(null);
 
-  const items = useMemo(() => (tab === 'jobs' ? sampleJobs : sampleEmployers), [tab]);
+  const items = useMemo(
+    () => (tab === "jobs" ? sampleJobs : sampleEmployers),
+    [tab]
+  );
 
   const onSwipe = (dir: SwipeDirection, item: Job | Employer) => {
-    const label = 'title' in item ? item.title : item.name;
-    setLastAction(`${dir === 'right' ? 'Liked' : 'Dismissed'}: ${label}`);
-    // later: call API to persist preference
+    const label = "title" in item ? item.title : item.name;
+    setLastAction(`${dir === "right" ? "Liked" : "Dismissed"}: ${label}`);
+    // TODO: connect to backend later
   };
+
+  // -----------------------
+  // Render
+  // -----------------------
+  if (loading) {
+    return <div className="p-6 text-center">Loading...</div>;
+  }
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-bold">Job Matching Platform</h1>
 
+      {/* Tabs */}
       <div className="mt-6 inline-flex rounded-xl border p-1 bg-white">
         <button
-          className={`px-4 py-2 rounded-lg text-sm ${tab === 'jobs' ? 'bg-gray-900 text-white' : ''}`}
-          onClick={() => setTab('jobs')}
+          className={`px-4 py-2 rounded-lg text-sm ${
+            tab === "jobs" ? "bg-gray-900 text-white" : ""
+          }`}
+          onClick={() => setTab("jobs")}
         >
           Jobs
         </button>
         <button
-          className={`px-4 py-2 rounded-lg text-sm ${tab === 'employers' ? 'bg-gray-900 text-white' : ''}`}
-          onClick={() => setTab('employers')}
+          className={`px-4 py-2 rounded-lg text-sm ${
+            tab === "employers" ? "bg-gray-900 text-white" : ""
+          }`}
+          onClick={() => setTab("employers")}
         >
           Employers
         </button>
       </div>
 
+      {/* SwipeDeck */}
       <div className="mt-8 flex justify-center">
         <SwipeDeck
           items={items}
           onSwipe={onSwipe}
-          getId={(it) => ('id' in it ? it.id : Math.random().toString(36))}
+          getId={(it) => ("id" in it ? it.id : Math.random().toString(36))}
           renderItem={(it) =>
-            tab === 'jobs' ? (
+            tab === "jobs" ? (
               <div className="m-auto h-[400px] w-[360px]">
                 <JobCard job={it as Job} />
               </div>
@@ -57,8 +102,12 @@ export default function HomePage() {
         />
       </div>
 
+      {/* Last action */}
       {lastAction && (
-        <p className="mt-4 text-center text-sm text-gray-600" aria-live="polite">
+        <p
+          className="mt-4 text-center text-sm text-gray-600"
+          aria-live="polite"
+        >
           {lastAction}
         </p>
       )}
