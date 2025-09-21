@@ -26,6 +26,8 @@ export default function Page() {
     console.log("✅ User logged in as:", role);
     localStorage.setItem("token", "example-token"); // store session token
     localStorage.setItem("role", role);
+    // keep this in sync with the useEffect check so refresh persists login
+    localStorage.setItem("isAuthenticated", "true");
     setIsLoggedIn(true);
   };
 
