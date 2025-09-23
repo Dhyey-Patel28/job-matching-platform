@@ -1,117 +1,100 @@
+// src/app/page.tsx
 "use client";
 
-import EmployerCard, { type Employer } from "@/components/EmployerCard";
-import JobCard, { type Job } from "@/components/JobCard";
+import { useEffect, useState } from "react";
+import AppBackground from "@/components/AppBackground";
+import Splash from "@/components/Splash";
+import LandingHero from "@/components/LandingHero";
 import LoginPage from "@/components/LoginPage";
-import SwipeDeck, { type SwipeDirection } from "@/components/SwipeDeck";
-import { sampleEmployers, sampleJobs } from "@/data/sample";
-import { useEffect, useMemo, useState } from "react";
+import DiscoverView from "@/components/DiscoverView";
+import RegisterCard from "@/components/RegisterCard";
 
-export default function Page() {
-  // -----------------------
-  // Login state
-  // -----------------------
+type Role = "candidate" | "recruiter";
+type View = "landing" | "login" | "register" | "discover";
+
+export default function AppPage() {
+  // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<Role | null>(null);
 
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<View>("landing");
+
+  // Splash once per tab
+  const [showSplash, setShowSplash] = useState(false);
   useEffect(() => {
-    const token = localStorage.getItem("isAuthenticated");
-    if (token == "true") {
+    const seen = sessionStorage.getItem("splashSeen");
+    if (!seen) setShowSplash(true);
+  }, []);
+  const finishSplash = () => {
+    sessionStorage.setItem("splashSeen", "1");
+    setShowSplash(false);
+  };
+
+  // Persisted login (when Remember me was checked)
+  useEffect(() => {
+    const remembered = localStorage.getItem("isAuthenticated");
+    const role = localStorage.getItem("role") as Role | null;
+    if (remembered === "true" && role) {
       setIsLoggedIn(true);
+      setUserRole(role);
+      setView("discover");
+    } else {
+      setView("landing");
     }
     setLoading(false);
   }, []);
 
-  const handleLogin = (role: string) => {
-    console.log("✅ User logged in as:", role);
-    localStorage.setItem("token", "example-token"); // store session token
+  const handleLogin = (role: Role, remember: boolean) => {
     localStorage.setItem("role", role);
-    // keep this in sync with the useEffect check so refresh persists login
-    localStorage.setItem("isAuthenticated", "true");
+    if (remember) localStorage.setItem("isAuthenticated", "true");
+    else localStorage.removeItem("isAuthenticated");
+    setUserRole(role);
     setIsLoggedIn(true);
+    setView("discover");
   };
 
-  // -----------------------
-  // HomePage state
-  // -----------------------
-  const [tab, setTab] = useState<"jobs" | "employers">("jobs");
-  const [lastAction, setLastAction] = useState<string | null>(null);
-
-  const items = useMemo(
-    () => (tab === "jobs" ? sampleJobs : sampleEmployers),
-    [tab]
-  );
-
-  const onSwipe = (dir: SwipeDirection, item: Job | Employer) => {
-    const label = "title" in item ? item.title : item.name;
-    setLastAction(`${dir === "right" ? "Liked" : "Dismissed"}: ${label}`);
-    // TODO: connect to backend later
+  const handleLogout = () => {
+    localStorage.removeItem("role");
+    localStorage.removeItem("isAuthenticated");
+    setIsLoggedIn(false);
+    setUserRole(null);
+    setView("landing");
   };
 
-  // -----------------------
-  // Render
-  // -----------------------
-  if (loading) {
-    return <div className="p-6 text-center">Loading...</div>;
-  }
+  const onExplore = () => setView(isLoggedIn ? "discover" : "login");
+  const onLogin = () => setView("login");
+  const onCreate = () => setView("register");
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  if (loading) return <div className="p-6 text-center">Loading...</div>;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-bold">Job Matching Platform</h1>
+    <main className="relative min-h-screen overflow-hidden">
+      <AppBackground />
+      
+      {showSplash && (
+        <Splash onFinish={finishSplash} brand="Job Matching" />
+      )}
 
-      {/* Tabs */}
-      <div className="mt-6 inline-flex rounded-xl border p-1 bg-white">
-        <button
-          className={`px-4 py-2 rounded-lg text-sm ${
-            tab === "jobs" ? "bg-gray-900 text-white" : ""
-          }`}
-          onClick={() => setTab("jobs")}
-        >
-          Jobs
-        </button>
-        <button
-          className={`px-4 py-2 rounded-lg text-sm ${
-            tab === "employers" ? "bg-gray-900 text-white" : ""
-          }`}
-          onClick={() => setTab("employers")}
-        >
-          Employers
-        </button>
-      </div>
+      {view === "landing" && (
+        <LandingHero onExplore={onExplore} onLogin={onLogin} onCreate={onCreate} />
+      )}
 
-      {/* SwipeDeck */}
-      <div className="mt-8 flex justify-center">
-        <SwipeDeck
-          items={items}
-          onSwipe={onSwipe}
-          getId={(it) => ("id" in it ? it.id : Math.random().toString(36))}
-          renderItem={(it) =>
-            tab === "jobs" ? (
-              <div className="m-auto h-[400px] w-[360px]">
-                <JobCard job={it as Job} />
-              </div>
-            ) : (
-              <div className="m-auto h-[400px] w-[360px]">
-                <EmployerCard employer={it as Employer} />
-              </div>
-            )
-          }
-          emptyState={<div className="p-6">You’re all caught up. 🎉</div>}
-        />
-      </div>
+      {view === "login" && (
+        <div className="grid min-h-screen place-items-center px-4">
+          <LoginPage onLogin={handleLogin} />
+        </div>
+      )}
 
-      {/* Last action */}
-      {lastAction && (
-        <p
-          className="mt-4 text-center text-sm text-gray-600"
-          aria-live="polite"
-        >
-          {lastAction}
-        </p>
+      {view === "register" && (
+        <div className="grid min-h-screen place-items-center px-4">
+          <RegisterCard onBack={() => setView("login")} />
+        </div>
+      )}
+
+      {view === "discover" && (
+        <DiscoverView userRole={userRole} onLogout={handleLogout} />
       )}
     </main>
   );
