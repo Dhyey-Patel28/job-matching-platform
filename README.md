@@ -26,4 +26,3 @@ npm run dev
 - CI must pass. Squash-merge with a clean title.
 
 See **CONTRIBUTING.md** for the full policy.
-
