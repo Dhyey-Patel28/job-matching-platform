@@ -16,6 +16,7 @@ Use any stack. The CI workflow currently just runs a placeholder script so statu
 npm install
 npm run dev
 # open http://localhost:3000
+```
 
 ## Workflow (TL;DR)
 - Create an **Issue** for every task.
@@ -26,4 +27,3 @@ npm run dev
 - CI must pass. Squash-merge with a clean title.
 
 See **CONTRIBUTING.md** for the full policy.
-
