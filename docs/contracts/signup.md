@@ -12,9 +12,11 @@
 {
     "email": "string",
     "password": "string",
-    "name": "string", 
-    "phone": "string", 
-    "userType": "string" 
+    "first_name": "string",
+    "last_name": "string",
+    "city": "string",
+    "state": "string",
+    "desired_job_tiles": ["string"]
 }
 ```
 
