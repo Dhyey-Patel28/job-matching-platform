@@ -1,6 +1,6 @@
 // src/components/DiscoverView.tsx
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from "react";
 import SwipeDeck, { type SwipeDirection } from '@/components/SwipeDeck';
 import EmployerCard, { type Employer } from '@/components/EmployerCard';
 import JobCard, { type Job } from '@/components/JobCard';
@@ -57,6 +57,56 @@ export default function DiscoverView({
 }) {
   const [tab, setTab] = useState<'jobs' | 'employers'>('jobs');
   const [lastAction, setLastAction] = useState<string | null>(null);
+
+  const [jobs, setJobs] = useState<Job[] | null>(null);
+  const [employers, setEmployers] = useState<Employer[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [jobsRes, empRes] = await Promise.all([
+          fetch("/api/jobs"),
+          fetch("/api/employers"),
+        ]);
+
+        if (!jobsRes.ok || !empRes.ok) {
+          throw new Error("Failed to fetch data");
+        }
+
+        const jobsJson = await jobsRes.json();
+        const empJson = await empRes.json();
+
+        if (cancelled) return;
+
+        setJobs(
+          Array.isArray(jobsJson.jobs) && jobsJson.jobs.length
+            ? jobsJson.jobs
+            : sampleJobs,
+        );
+        setEmployers(
+          Array.isArray(empJson.employers) && empJson.employers.length
+            ? empJson.employers
+            : sampleEmployers,
+        );
+      } catch (err) {
+        console.error("Falling back to sample data:", err);
+        if (cancelled) return;
+        setJobs(sampleJobs);
+        setEmployers(sampleEmployers);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // per-deck stats
   const [jobStats, setJobStats] = useState({ liked: 0, noped: 0 });
@@ -139,11 +189,15 @@ export default function DiscoverView({
         </div>
       </header>
 
-      {/* Row 2: deck */}
+            {/* Row 2: deck */}
       <div className="flex items-start justify-center pt-2 md:pt-4 overflow-visible">
-        {tab === 'jobs' ? (
+        {loading ? (
+          <div className="py-16 text-sm text-white/80">
+            Loading matches…
+          </div>
+        ) : tab === "jobs" ? (
           <SwipeDeck<Job>
-            items={sampleJobs}
+            items={jobs ?? sampleJobs}
             onSwipe={onSwipeJob}
             width="clamp(36ch, 42vw, 60ch)"
             controlsInside
@@ -154,7 +208,7 @@ export default function DiscoverView({
           />
         ) : (
           <SwipeDeck<Employer>
-            items={sampleEmployers}
+            items={employers ?? sampleEmployers}
             onSwipe={onSwipeEmployer}
             width="clamp(36ch, 42vw, 60ch)"
             controlsInside

@@ -1,17 +1,54 @@
 // src/components/RegisterCard.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 export default function RegisterCard({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const fakeSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // TODO: wire to backend later
-    alert("Account creation is a placeholder. Going back to login.");
-    onBack();
+    setError(null);
+    setMessage(null);
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pwd }),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            message?: string;
+            error?: string;
+          }
+        | null;
+
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "Failed to register. Please try again.");
+        return;
+      }
+
+      setMessage(
+        data.message ??
+          "Registration accepted (demo). You can go back to the login screen.",
+      );
+
+      // Optional: automatically go back after a short delay
+      setTimeout(() => onBack(), 1200);
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -21,9 +58,11 @@ export default function RegisterCard({ onBack }: { onBack: () => void }) {
         This is a placeholder. Hook this up to your backend when ready.
       </p>
 
-      <form onSubmit={fakeSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            Email
+          </label>
           <input
             type="email"
             value={email}
@@ -34,7 +73,9 @@ export default function RegisterCard({ onBack }: { onBack: () => void }) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Password</label>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            Password
+          </label>
           <input
             type="password"
             value={pwd}
@@ -45,11 +86,23 @@ export default function RegisterCard({ onBack }: { onBack: () => void }) {
           />
         </div>
 
+        {error && (
+          <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="text-sm text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">
+            {message}
+          </p>
+        )}
+
         <button
           type="submit"
-          className="w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:shadow-sm active:translate-y-px"
+          disabled={submitting}
+          className="mt-2 w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          Sign up
+          {submitting ? "Creating account…" : "Sign up"}
         </button>
 
         <button

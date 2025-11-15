@@ -1,25 +1,71 @@
 // src/components/LoginPage.tsx
 "use client";
-import { useState } from "react";
+
+import { useState, type FormEvent } from "react";
 
 type Role = "candidate" | "recruiter";
 
-export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember: boolean) => void }) {
+type LoginSuccess = {
+  ok: true;
+  user: { username: string; role: Role };
+  remember: boolean;
+  token?: string;
+};
+
+type LoginError = {
+  ok?: false;
+  error?: string;
+};
+
+type LoginResponse = LoginSuccess | LoginError;
+
+export default function LoginPage({
+  onLogin,
+}: {
+  onLogin: (role: Role, remember: boolean) => void;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("candidate");
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
 
-  const validUsername = "admin";
-  const validPassword = "password123";
-
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (username === validUsername && password === validPassword) {
-      setError("");
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, role, remember }),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | LoginResponse
+        | null;
+
+      const isError =
+        !res.ok ||
+        data === null ||
+        !("ok" in data) ||
+        data.ok !== true;
+
+      if (isError) {
+        const errorMessage =
+          data && "error" in data && data.error
+            ? data.error
+            : "Failed to sign in. Please try again.";
+        setError(errorMessage);
+        return;
+      }
+
+      // Success: let the parent know
       onLogin(role, remember);
-    } else setError("Invalid username or password");
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   return (
@@ -31,23 +77,29 @@ export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember:
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xl font-black text-gray-900 shadow-sm">
             J
           </div>
-          <div className="text-sm font-medium text-white/90">Job Matching Platform</div>
+          <div className="text-sm font-medium text-white/90">
+            Job Matching Platform
+          </div>
         </div>
 
         <h1 className="text-xl font-semibold text-white">Welcome back</h1>
-        <p className="mt-1 text-sm text-white/80">Sign in and choose your role to tailor the experience.</p>
+        <p className="mt-1 text-sm text-white/80">
+          Sign in and choose your role to tailor the experience.
+        </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
           {/* Role selector */}
           <div className="inline-grid grid-cols-2 overflow-hidden rounded-xl ring-1 ring-white/20 bg-white/10 backdrop-blur">
-            {(["candidate","recruiter"] as Role[]).map((r) => (
+            {(["candidate", "recruiter"] as Role[]).map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setRole(r)}
                 className={[
                   "px-4 py-2 text-sm transition",
-                  role === r ? "bg-white text-gray-900" : "text-white/90 hover:bg-white/10"
+                  role === r
+                    ? "bg-white text-gray-900"
+                    : "text-white/90 hover:bg-white/10",
                 ].join(" ")}
                 aria-pressed={role === r}
               >
@@ -57,7 +109,12 @@ export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember:
           </div>
 
           <div>
-            <label htmlFor="username" className="mb-1 block text-xs font-medium text-white/80">Username</label>
+            <label
+              htmlFor="username"
+              className="mb-1 block text-xs font-medium text-white/80"
+            >
+              Username
+            </label>
             <input
               id="username"
               value={username}
@@ -70,7 +127,12 @@ export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember:
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1 block text-xs font-medium text-white/80">Password</label>
+            <label
+              htmlFor="password"
+              className="mb-1 block text-xs font-medium text-white/80"
+            >
+              Password
+            </label>
             <input
               id="password"
               type="password"
@@ -93,10 +155,17 @@ export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember:
               />
               Remember me
             </label>
-            <a href="#" className="text-white/90 underline-offset-2 hover:underline">Forgot password?</a>
+            <a
+              href="#"
+              className="text-white/90 underline-offset-2 hover:underline"
+            >
+              Forgot password?
+            </a>
           </div>
 
-          {error && <p className="text-sm font-medium text-rose-100">{error}</p>}
+          {error && (
+            <p className="text-sm font-medium text-rose-100">{error}</p>
+          )}
 
           <button
             type="submit"
@@ -106,7 +175,8 @@ export default function LoginPage({ onLogin }: { onLogin: (role: Role, remember:
           </button>
 
           <p className="text-center text-xs text-white/80 mt-2">
-            Demo: <span className="font-mono">admin</span> / <span className="font-mono">password123</span>
+            Demo: <span className="font-mono">admin</span> /{" "}
+            <span className="font-mono">password123</span>
           </p>
         </form>
       </div>

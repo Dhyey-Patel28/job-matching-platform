@@ -64,9 +64,12 @@ export default function SwipeDeck<T extends WithId>({
   function canVibrate(n: unknown): n is Navigator & { vibrate: (p: number | number[]) => boolean } {
     return !!n && typeof (n as Navigator).vibrate === 'function';
   }
-  const vibrate = (ms: number) => {
-    if (typeof navigator !== 'undefined' && canVibrate(navigator)) navigator.vibrate(ms);
-  };
+
+  const vibrate = useCallback((ms: number) => {
+    if (typeof navigator !== 'undefined' && canVibrate(navigator)) {
+      navigator.vibrate(ms);
+    }
+  }, []);
 
   const commitSwipe = useCallback(
     (dir: SwipeDirection) => {
