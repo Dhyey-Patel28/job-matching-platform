@@ -1,15 +1,12 @@
 package com.FairMatch.FairMatch.service;
 
 import com.FairMatch.FairMatch.model.Auth;
-import com.FairMatch.FairMatch.model.User;
 import com.FairMatch.FairMatch.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import jakarta.servlet.http.Cookie;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,7 +24,8 @@ public class JwtServiceTest {
         jwtService = new JwtService(jwtUtil);
 
         mockUser = new Auth();
-        mockUser.setUser(User.builder().id(UUID.randomUUID()).build());
+        mockUser.setId(java.util.UUID.randomUUID());
+        mockUser.setUserId(java.util.UUID.randomUUID());
         mockUser.setUsername("testuser@example.com");
         mockUser.setPassword("hashedpassword");
         mockUser.setRole("USER");

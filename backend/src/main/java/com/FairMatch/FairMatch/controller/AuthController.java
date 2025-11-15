@@ -1,12 +1,10 @@
 package com.FairMatch.FairMatch.controller;
 
 import com.FairMatch.FairMatch.dto.LoginRequest;
-import com.FairMatch.FairMatch.dto.SignupRequest;
 import com.FairMatch.FairMatch.model.Auth;
 import com.FairMatch.FairMatch.service.AuthService;
 import com.FairMatch.FairMatch.service.JwtService;
 import jakarta.validation.Valid;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -36,23 +34,6 @@ public class AuthController {
             user = authService.signin(request);
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-
-        String token = jwtService.generateToken(user);
-        Cookie cookie = jwtService.generateAuthCookie(token);
-        response.addCookie(cookie);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/signup")
-    public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest request, HttpServletResponse response) {
-        Auth user;
-        try {
-            user = authService.signup(request);
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

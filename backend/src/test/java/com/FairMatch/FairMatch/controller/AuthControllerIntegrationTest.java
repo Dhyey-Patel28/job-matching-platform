@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import jakarta.servlet.http.Cookie;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,6 +39,8 @@ class AuthControllerIntegrationTest {
     @BeforeEach
     void setUp() {
         user = new Auth();
+        user.setId(UUID.randomUUID());
+        user.setUserId(UUID.randomUUID());
         user.setUsername("user1");
         user.setPassword("hashed");
         user.setRole("USER");
@@ -89,69 +90,5 @@ class AuthControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(badBody))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void signup_success_setsCookieAndReturnsOk() throws Exception {
-        Auth newUser = new Auth();
-        newUser.setUsername("newuser@example.com");
-        newUser.setPassword("hashed");
-        newUser.setRole("USER");
-        when(authService.signup(any())).thenReturn(newUser);
-        when(jwtService.generateToken(newUser)).thenReturn("jwt-token");
-        when(jwtService.generateAuthCookie("jwt-token")).thenReturn(new Cookie("authToken", "jwt-token"));
-
-        String body = "{" +
-                "\"email\":\"newuser@example.com\"," +
-                "\"password\":\"password123\"," +
-                "\"name\":\"New User\"," +
-                "\"phone\":\"5551234567\"," +
-                "\"userType\":\"JOB_SEEKER\"}";
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("authToken"));
-    }
-
-    @Test
-    void signup_userAlreadyExists_returnsConflict() throws Exception {
-        when(authService.signup(any())).thenThrow(new DataIntegrityViolationException("exists"));
-        String body = "{" +
-                "\"email\":\"existing@example.com\"," +
-                "\"password\":\"password123\"," +
-                "\"name\":\"Existing User\"," +
-                "\"phone\":\"5551234567\"," +
-                "\"userType\":\"JOB_SEEKER\"}";
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    void signup_invalidRequest_returnsBadRequest() throws Exception {
-        String badBody = "{" +
-                "\"email\":\"bademail\"," +
-                "\"password\":\"short\"}";
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(badBody))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void signup_genericException_returnsInternalServerError() throws Exception {
-        when(authService.signup(any())).thenThrow(new RuntimeException("db error"));
-        String body = "{" +
-                "\"email\":\"newuser2@example.com\"," +
-                "\"password\":\"password123\"," +
-                "\"name\":\"New User2\"," +
-                "\"phone\":\"5551234567\"," +
-                "\"userType\":\"JOB_SEEKER\"}";
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isInternalServerError());
     }
 }

@@ -1,24 +1,23 @@
 package com.FairMatch.FairMatch.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Setter
+@Getter
 @Entity
 @Table(name = "authentication")
 public class Auth {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(nullable = false)
     private String username;
@@ -29,7 +28,5 @@ public class Auth {
     @Column(nullable = false)
     private String role;
 
-    public UUID getUserId() {
-        return user != null ? user.getId() : null;
-    }
 }
+
