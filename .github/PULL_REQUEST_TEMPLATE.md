@@ -1,13 +1,18 @@
+## Summary
+- What changed? Why? Provide context, screenshots, or logs.
+
 ## Linked Issues
 Closes #<issue-id>
 
-## Backend Checklist
-- [ ] Linked the issue (e.g., `Closes #123`)
-- [ ] Comprehensive E2E tests
-- [ ] Comprehensive integration tests
-- [ ] Comprehensive unit tests
-- [ ] Bruno document showing how to use the endpoint
-- [ ] Endpoint is properly secured in SecurityConfig
-- [ ] Foreign Key/Primary Key constraints are set up
-- [ ] Insert test data in TestDataConfig
-- [ ] Contract information is up to date
+## How to Test
+1. Steps to reproduce / validate
+2. Expected vs actual
+
+## Checklist
+- [ ] I linked the issue (e.g., `Closes #123`)
+- [ ] I added/updated tests or explained why not applicable
+- [ ] I updated docs if needed
+
+### Reviewer checklist (must be checked by reviewer)
+- [ ] I pulled this branch locally and ran `./scripts/ci.sh`
+- [ ] I verified acceptance criteria
