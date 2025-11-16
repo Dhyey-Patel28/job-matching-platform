@@ -1,22 +1,26 @@
 // apps/web/src/app/api/jobs/route.ts
 import { NextResponse } from "next/server";
-import { sampleJobs } from "@/data/sample";
 import { prisma } from "@/server/db";
-import type { Prisma } from "@prisma/client";   // 👈 add this
+import { sampleJobs } from "@/data/sample";
 import type { Job } from "@/components/JobCard";
+import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   try {
-    // If there are no rows yet, seed from sampleJobs
     const existingCount = await prisma.jobListing.count();
 
     if (existingCount === 0) {
-      await prisma.jobListing.createMany({
-        data: sampleJobs.map((job) => ({
-          // Prisma expects JsonNull | InputJsonValue here
-          payload: job as Prisma.InputJsonValue,   // 👈 key change
-        })),
-      });
+      // Seed DB once with sample jobs.
+      // Cast through `unknown` → Prisma.JobListingCreateManyInput[] to keep
+      // ESLint happy (no `any`) while telling Prisma "this is valid JSON".
+      const data = sampleJobs.map(
+        (job) =>
+          ({
+            payload: job,
+          } as unknown as Prisma.JobListingCreateManyInput),
+      );
+
+      await prisma.jobListing.createMany({ data });
     }
 
     const rows = await prisma.jobListing.findMany({
@@ -24,12 +28,12 @@ export async function GET() {
     });
 
     if (!rows.length) {
-      // Safety fallback — shouldn't normally hit if seeding worked
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    // payload is JsonValue at runtime; we know it's shaped like Job
-    const jobs = rows.map((row) => row.payload as Job);
+    const jobs = rows.map(
+      (row: { payload: unknown }) => row.payload as Job,
+    );
 
     return NextResponse.json({ jobs });
   } catch (err) {

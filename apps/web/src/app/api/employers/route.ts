@@ -2,19 +2,23 @@
 import { NextResponse } from "next/server";
 import { sampleEmployers } from "@/data/sample";
 import { prisma } from "@/server/db";
-import type { Prisma } from "@prisma/client";    // 👈 add this
 import type { Employer } from "@/components/EmployerCard";
+import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   try {
     const existingCount = await prisma.employerListing.count();
 
     if (existingCount === 0) {
-      await prisma.employerListing.createMany({
-        data: sampleEmployers.map((employer) => ({
-          payload: employer as Prisma.InputJsonValue,   // 👈 key change
-        })),
-      });
+      // Seed DB once with sample employers.
+      const data = sampleEmployers.map(
+        (employer) =>
+          ({
+            payload: employer,
+          } as unknown as Prisma.EmployerListingCreateManyInput),
+      );
+
+      await prisma.employerListing.createMany({ data });
     }
 
     const rows = await prisma.employerListing.findMany({
@@ -25,7 +29,9 @@ export async function GET() {
       return NextResponse.json({ employers: sampleEmployers });
     }
 
-    const employers = rows.map((row) => row.payload as Employer);
+    const employers = rows.map(
+      (row: { payload: unknown }) => row.payload as Employer,
+    );
 
     return NextResponse.json({ employers });
   } catch (err) {

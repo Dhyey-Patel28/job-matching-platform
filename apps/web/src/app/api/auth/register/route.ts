@@ -2,29 +2,18 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db";
-import { Prisma } from "@prisma/client";
-
-// Mirror your enums as unions instead of importing them
-type Role = "candidate" | "recruiter";
-type ProfileMode = "candidate" | "employer" | "both";
 
 type RegisterBody = {
   email?: string;
   password?: string;
-  profileMode?: ProfileMode | string;
+  profileMode?: "candidate" | "employer" | "both";
 };
 
-const ALLOWED_PROFILE_MODES: ProfileMode[] = [
-  "candidate",
-  "employer",
-  "both",
-];
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   let body: RegisterBody;
 
   try {
-    body = (await request.json()) as RegisterBody;
+    body = (await req.json()) as RegisterBody;
   } catch {
     return NextResponse.json(
       { ok: false, error: "Invalid JSON body." },
@@ -33,7 +22,8 @@ export async function POST(request: Request) {
   }
 
   const email = body.email?.trim().toLowerCase();
-  const password = body.password;
+  const password = body.password ?? "";
+  const profileMode = body.profileMode ?? "candidate";
 
   if (!email || !password) {
     return NextResponse.json(
@@ -42,65 +32,59 @@ export async function POST(request: Request) {
     );
   }
 
-  const mode: ProfileMode = ALLOWED_PROFILE_MODES.includes(
-    body.profileMode as ProfileMode,
-  )
-    ? (body.profileMode as ProfileMode)
-    : "candidate";
+  if (password.length < 8) {
+    return NextResponse.json(
+      { ok: false, error: "Password must be at least 8 characters." },
+      { status: 400 },
+    );
+  }
 
-  // Derive backend role from profileMode
-  const role: Role = mode === "candidate" ? "candidate" : "recruiter";
+  if (!["candidate", "employer", "both"].includes(profileMode)) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid profile mode." },
+      { status: 400 },
+    );
+  }
 
   try {
-    // Make sure email is unique
-    const existing = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        { ok: false, error: "This email is already registered." },
-        { status: 409 },
-      );
-    }
-
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email,
         passwordHash,
-        role,
-        profileMode: mode,
+        // For now all signups are "candidate"; you can extend later.
+        role: "candidate",
+        profileMode,
       },
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: "Registration successful.",
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role as Role,
-        profileMode: user.profileMode as ProfileMode,
+    return NextResponse.json(
+      {
+        ok: true,
+        message: "Registration successful. You can now sign in.",
       },
-    });
-  } catch (err) {
-    console.error("Register error:", err);
+      { status: 200 },
+    );
+  } catch (err: unknown) {
+    console.error("Error during registration:", err);
 
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
-    ) {
-      // Unique constraint (email) just in case
+    // Don’t depend on PrismaClientKnownRequestError type – just
+    // check the error code in a type-safe-ish way.
+    const maybePrismaError = err as { code?: string };
+
+    if (maybePrismaError && maybePrismaError.code === "P2002") {
       return NextResponse.json(
-        { ok: false, error: "This email is already registered." },
+        {
+          ok: false,
+          error: "An account with that email already exists.",
+        },
         { status: 409 },
       );
     }
 
     return NextResponse.json(
-      { ok: false, error: "Failed to register. Please try again." },
+      { ok: false, error: "Failed to register. Please try again later." },
       { status: 500 },
     );
   }
