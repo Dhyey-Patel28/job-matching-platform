@@ -1,12 +1,13 @@
-// src/components/DiscoverView.tsx
-'use client';
-import { useEffect, useState } from "react";
-import SwipeDeck, { type SwipeDirection } from '@/components/SwipeDeck';
-import EmployerCard, { type Employer } from '@/components/EmployerCard';
-import JobCard, { type Job } from '@/components/JobCard';
-import { sampleEmployers, sampleJobs } from '@/data/sample';
+"use client";
 
-type Role = 'candidate' | 'recruiter';
+import { useEffect, useState } from "react";
+import SwipeDeck, { type SwipeDirection } from "@/components/SwipeDeck";
+import EmployerCard, { type Employer } from "@/components/EmployerCard";
+import JobCard, { type Job } from "@/components/JobCard";
+import { sampleEmployers, sampleJobs } from "@/data/sample";
+
+type Role = "candidate" | "recruiter";
+type ProfileMode = "candidate" | "employer" | "both";
 
 function EndOfDeck({
   total,
@@ -23,9 +24,11 @@ function EndOfDeck({
       <div className="rounded-2xl border bg-white/90 p-8 text-center shadow-sm">
         <div className="text-3xl mb-1">🎉</div>
         <h3 className="text-xl font-semibold">You’re all caught up!</h3>
-        <p className="mt-1 text-sm text-gray-600">Nice work — here’s how you did.</p>
+        <p className="mt-1 text-sm text-gray-600">
+          Nice work — here’s how you did.
+        </p>
 
-        <div className="mt-6 grid grid-cols-3 gap-4 max-w-md mx-auto">
+        <div className="mt-6 grid max-w-md grid-cols-3 gap-4 mx-auto">
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-lg font-semibold">{total}</div>
             <div className="text-[11px] text-gray-600">Reviewed</div>
@@ -50,17 +53,39 @@ function EndOfDeck({
 
 export default function DiscoverView({
   userRole,
+  profileMode,
   onLogout,
+  onEditProfile,
 }: {
   userRole: Role | null;
+  profileMode: ProfileMode;
   onLogout: () => void;
+  onEditProfile: () => void;
 }) {
-  const [tab, setTab] = useState<'jobs' | 'employers'>('jobs');
+  const [tab, setTab] = useState<"jobs" | "employers">(
+    profileMode === "employer" ? "employers" : "jobs",
+  );
   const [lastAction, setLastAction] = useState<string | null>(null);
 
   const [jobs, setJobs] = useState<Job[] | null>(null);
   const [employers, setEmployers] = useState<Employer[] | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Which decks are allowed for this profile mode?
+  const allowedTabs: Array<"jobs" | "employers"> =
+    profileMode === "candidate"
+      ? ["jobs"]
+      : profileMode === "employer"
+      ? ["employers"]
+      : ["jobs", "employers"];
+
+  // Keep tab in sync with allowedTabs when profileMode changes
+  useEffect(() => {
+    if (!allowedTabs.includes(tab)) {
+      setTab(allowedTabs[0]);
+    }
+    // allowedTabs depends only on profileMode, and tab is in deps
+  }, [profileMode, tab, allowedTabs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,12 +108,12 @@ export default function DiscoverView({
 
         setJobs(
           Array.isArray(jobsJson.jobs) && jobsJson.jobs.length
-            ? jobsJson.jobs
+            ? (jobsJson.jobs as Job[])
             : sampleJobs,
         );
         setEmployers(
           Array.isArray(empJson.employers) && empJson.employers.length
-            ? empJson.employers
+            ? (empJson.employers as Employer[])
             : sampleEmployers,
         );
       } catch (err) {
@@ -113,89 +138,128 @@ export default function DiscoverView({
   const [empStats, setEmpStats] = useState({ liked: 0, noped: 0 });
 
   const onSwipeJob = (dir: SwipeDirection, item: Job) => {
-    setLastAction(`${dir === 'right' ? 'Saved' : 'Dismissed'}: ${item.title}`);
+    setLastAction(
+      `${dir === "right" ? "Saved" : "Dismissed"}: ${item.title}`,
+    );
     setJobStats((s) => ({
-      liked: s.liked + (dir === 'right' ? 1 : 0),
-      noped: s.noped + (dir === 'left' ? 1 : 0),
+      liked: s.liked + (dir === "right" ? 1 : 0),
+      noped: s.noped + (dir === "left" ? 1 : 0),
     }));
   };
 
   const onSwipeEmployer = (dir: SwipeDirection, item: Employer) => {
-    setLastAction(`${dir === 'right' ? 'Saved' : 'Dismissed'}: ${item.name}`);
+    setLastAction(
+      `${dir === "right" ? "Saved" : "Dismissed"}: ${item.name}`,
+    );
     setEmpStats((s) => ({
-      liked: s.liked + (dir === 'right' ? 1 : 0),
-      noped: s.noped + (dir === 'left' ? 1 : 0),
+      liked: s.liked + (dir === "right" ? 1 : 0),
+      noped: s.noped + (dir === "left" ? 1 : 0),
     }));
   };
 
   const jobEmpty = (
-    <EndOfDeck total={jobStats.liked + jobStats.noped} liked={jobStats.liked} noped={jobStats.noped} />
+    <EndOfDeck
+      total={jobStats.liked + jobStats.noped}
+      liked={jobStats.liked}
+      noped={jobStats.noped}
+    />
   );
   const empEmpty = (
-    <EndOfDeck total={empStats.liked + empStats.noped} liked={empStats.liked} noped={empStats.noped} />
+    <EndOfDeck
+      total={empStats.liked + empStats.noped}
+      liked={empStats.liked}
+      noped={empStats.noped}
+    />
   );
+
+  const showingJobs = tab === "jobs";
 
   return (
     <div className="mx-auto grid h-[100dvh] max-w-6xl grid-rows-[auto_1fr_auto] gap-3 px-4 py-4 overflow-visible">
-      {/* Row 1: compact toolbar + centered tabs */}
+      {/* Row 1: compact toolbar + centered context */}
       <header className="grid grid-cols-[1fr_auto_1fr] items-center">
         {/* Left: brand */}
         <div className="flex items-center gap-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-white text-[0.9rem] font-black text-gray-900 shadow-sm">
             J
           </div>
-          <span className="text-sm font-medium text-white/90">Job Matching Platform</span>
+          <span className="text-sm font-medium text-white/90">
+            Job Matching Platform
+          </span>
         </div>
 
-        {/* Center: tabs */}
+        {/* Center: role-aware context / tabs */}
         <div className="justify-self-center">
-          <div className="inline-flex overflow-hidden rounded-xl border border-white/30 bg-white/10 p-1 shadow-sm backdrop-blur">
-            <button
-              onClick={() => setTab('jobs')}
-              className={[
-                'rounded-lg px-4 py-2 text-sm transition',
-                tab === 'jobs' ? 'bg-white text-gray-900' : 'text-white hover:bg-white/10',
-              ].join(' ')}
-              aria-pressed={tab === 'jobs'}
-            >
-              Candidates: Jobs
-            </button>
-            <button
-              onClick={() => setTab('employers')}
-              className={[
-                'rounded-lg px-4 py-2 text-sm transition',
-                tab === 'employers' ? 'bg-white text-gray-900' : 'text-white hover:bg-white/10',
-              ].join(' ')}
-              aria-pressed={tab === 'employers'}
-            >
-              Recruiters: Employers
-            </button>
-          </div>
+          {allowedTabs.length === 2 ? (
+            <div className="inline-flex overflow-hidden rounded-xl border border-white/30 bg-white/10 p-1 shadow-sm backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setTab("jobs")}
+                className={[
+                  "rounded-lg px-4 py-2 text-sm transition",
+                  tab === "jobs"
+                    ? "bg-white text-gray-900"
+                    : "text-white hover:bg-white/10",
+                ].join(" ")}
+                aria-pressed={tab === "jobs"}
+              >
+                Candidates: Jobs
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("employers")}
+                className={[
+                  "rounded-lg px-4 py-2 text-sm transition",
+                  tab === "employers"
+                    ? "bg-white text-gray-900"
+                    : "text-white hover:bg-white/10",
+                ].join(" ")}
+                aria-pressed={tab === "employers"}
+              >
+                Recruiters: Employers
+              </button>
+            </div>
+          ) : (
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur">
+              {profileMode === "candidate"
+                ? "Discovering jobs tailored to you"
+                : profileMode === "employer"
+                ? "Discovering employers and teams"
+                : "Discovering jobs and employers"}
+            </span>
+          )}
         </div>
 
-        {/* Right: user chip + logout */}
-        <div className="justify-self-end flex items-center gap-2">
+        {/* Right: user chip + nav + logout */}
+        <div className="flex items-center justify-end gap-2">
           {userRole && (
             <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur">
-              Signed in as <strong className="ml-1 capitalize">{userRole}</strong>
+              Signed in as{" "}
+              <strong className="ml-1 capitalize">{userRole}</strong>
             </span>
           )}
           <button
+            type="button"
+            onClick={onEditProfile}
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+          >
+            Profile
+          </button>
+          <button
+            type="button"
             onClick={onLogout}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
           >
             Log out
           </button>
         </div>
       </header>
 
-            {/* Row 2: deck */}
+      {/* Row 2: deck */}
       <div className="flex items-start justify-center pt-2 md:pt-4 overflow-visible">
         {loading ? (
-          <div className="py-16 text-sm text-white/80">
-            Loading matches…
-          </div>
-        ) : tab === "jobs" ? (
+          <div className="py-16 text-sm text-white/80">Loading matches…</div>
+        ) : showingJobs ? (
           <SwipeDeck<Job>
             items={jobs ?? sampleJobs}
             onSwipe={onSwipeJob}
@@ -222,7 +286,7 @@ export default function DiscoverView({
 
       {/* Row 3: status */}
       <div className="pointer-events-none select-none text-center text-sm text-white/90">
-        {lastAction ? lastAction : 'Tip: drag or use ← / → (A / D).'}
+        {lastAction ? lastAction : "Tip: drag or use ← / → (A / D)."}
       </div>
     </div>
   );

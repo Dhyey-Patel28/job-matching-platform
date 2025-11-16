@@ -8,14 +8,17 @@ import LandingHero from "@/components/LandingHero";
 import LoginPage from "@/components/LoginPage";
 import DiscoverView from "@/components/DiscoverView";
 import RegisterCard from "@/components/RegisterCard";
+import ProfileView from "@/components/ProfileView";
 
 type Role = "candidate" | "recruiter";
-type View = "landing" | "login" | "register" | "discover";
+type ProfileMode = "candidate" | "employer" | "both";
+type View = "landing" | "login" | "register" | "profile" | "discover";
 
 export default function AppPage() {
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<Role | null>(null);
+  const [profileMode, setProfileMode] = useState<ProfileMode>("candidate");
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -36,9 +39,17 @@ export default function AppPage() {
   useEffect(() => {
     const remembered = localStorage.getItem("isAuthenticated");
     const role = localStorage.getItem("role") as Role | null;
+    const storedMode = localStorage.getItem("profileMode") as
+      | ProfileMode
+      | null;
+
     if (remembered === "true" && role) {
       setIsLoggedIn(true);
       setUserRole(role);
+      setProfileMode(
+        storedMode ?? (role === "candidate" ? "candidate" : "employer"),
+      );
+      // Returning visitors go straight to discovery; they can jump to Profile later
       setView("discover");
     } else {
       setView("landing");
@@ -46,18 +57,33 @@ export default function AppPage() {
     setLoading(false);
   }, []);
 
-  const handleLogin = (role: Role, remember: boolean) => {
+  const handleLogin = (
+    user: { role: Role; profileMode: ProfileMode },
+    remember: boolean,
+  ) => {
+    const { role, profileMode } = user;
+
     localStorage.setItem("role", role);
+    localStorage.setItem("profileMode", profileMode);
     if (remember) localStorage.setItem("isAuthenticated", "true");
     else localStorage.removeItem("isAuthenticated");
+
     setUserRole(role);
+    setProfileMode(profileMode);
     setIsLoggedIn(true);
-    setView("discover");
+    // After a fresh login, send them to profile setup first
+    setView("profile");
+  };
+
+  const handleProfileModeChange = (mode: ProfileMode) => {
+    setProfileMode(mode);
+    localStorage.setItem("profileMode", mode);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("role");
     localStorage.removeItem("isAuthenticated");
+    // You can keep or clear profileMode here; for now we keep it.
     setIsLoggedIn(false);
     setUserRole(null);
     setView("landing");
@@ -72,13 +98,15 @@ export default function AppPage() {
   return (
     <main className="relative min-h-screen overflow-hidden">
       <AppBackground />
-      
-      {showSplash && (
-        <Splash onFinish={finishSplash} brand="Job Matching" />
-      )}
+
+      {showSplash && <Splash onFinish={finishSplash} brand="Job Matching" />}
 
       {view === "landing" && (
-        <LandingHero onExplore={onExplore} onLogin={onLogin} onCreate={onCreate} />
+        <LandingHero
+          onExplore={onExplore}
+          onLogin={onLogin}
+          onCreate={onCreate}
+        />
       )}
 
       {view === "login" && (
@@ -93,8 +121,25 @@ export default function AppPage() {
         </div>
       )}
 
+      {view === "profile" && userRole && (
+        <div className="grid min-h-screen place-items-center px-4">
+          <ProfileView
+            userRole={userRole}
+            profileMode={profileMode}
+            onProfileModeChange={handleProfileModeChange}
+            onBackToDiscover={() => setView("discover")}
+            onLogout={handleLogout}
+          />
+        </div>
+      )}
+
       {view === "discover" && (
-        <DiscoverView userRole={userRole} onLogout={handleLogout} />
+        <DiscoverView
+          userRole={userRole}
+          profileMode={profileMode}
+          onLogout={handleLogout}
+          onEditProfile={() => setView("profile")}
+        />
       )}
     </main>
   );
