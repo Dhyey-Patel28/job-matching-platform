@@ -1,39 +1,40 @@
-// apps/web/src/app/api/jobs/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { sampleJobs } from "@/data/sample";
 import type { Job } from "@/components/JobCard";
-import type { Prisma } from "@prisma/client";
 
+/**
+ * GET /api/jobs
+ *
+ * Returns job cards built from EmployerProfile rows.
+ * If there are no employer profiles yet, falls back to the local sampleJobs.
+ */
 export async function GET() {
   try {
-    const existingCount = await prisma.jobListing.count();
-
-    if (existingCount === 0) {
-      // Seed DB once with sample jobs.
-      // Cast through `unknown` → Prisma.JobListingCreateManyInput[] to keep
-      // ESLint happy (no `any`) while telling Prisma "this is valid JSON".
-      const data = sampleJobs.map(
-        (job) =>
-          ({
-            payload: job,
-          } as unknown as Prisma.JobListingCreateManyInput),
-      );
-
-      await prisma.jobListing.createMany({ data });
-    }
-
-    const rows = await prisma.jobListing.findMany({
-      orderBy: { createdAt: "desc" },
+    const profiles = await prisma.employerProfile.findMany({
+      orderBy: { userId: "asc" },
     });
 
-    if (!rows.length) {
+    if (!profiles.length) {
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    const jobs = rows.map(
-      (row: { payload: unknown }) => row.payload as Job,
-    );
+    const jobs: Job[] = profiles.map((profile) => {
+      const tags =
+        profile.hiringFor
+          ?.split(/[,/]/)
+          .map((tag) => tag.trim())
+          .filter(Boolean) ?? [];
+
+      return {
+        id: profile.userId,
+        title: profile.roleTitle || "Open role",
+        company: profile.companyName || "Unknown company",
+        location: profile.location || "Remote / flexible",
+        tags,
+        summary: tags.length ? `Hiring for: ${tags.join(", ")}` : undefined,
+      };
+    });
 
     return NextResponse.json({ jobs });
   } catch (err) {
