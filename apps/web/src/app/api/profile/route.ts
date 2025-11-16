@@ -1,7 +1,8 @@
 // apps/web/src/app/api/profile/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
-import type { ProfileMode } from "@prisma/client";
+
+type ProfileMode = "candidate" | "employer" | "both";
 
 type CandidateProfilePayload = {
   fullName: string;

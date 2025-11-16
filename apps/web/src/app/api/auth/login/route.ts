@@ -2,7 +2,10 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db";
-import { Role, ProfileMode } from "@prisma/client";
+
+// Mirror your Prisma enums as simple string unions
+type Role = "candidate" | "recruiter";
+type ProfileMode = "candidate" | "employer" | "both";
 
 type LoginBody = {
   email?: string;
@@ -63,8 +66,8 @@ export async function POST(request: Request) {
     const payload: LoginUserPayload = {
       id: user.id,
       email: user.email,
-      role: user.role,
-      profileMode: user.profileMode,
+      role: user.role as Role,
+      profileMode: user.profileMode as ProfileMode,
     };
 
     // Still a stateless demo: frontend stores this in localStorage.

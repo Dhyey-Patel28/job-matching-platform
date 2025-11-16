@@ -2,7 +2,11 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db";
-import { Prisma, Role, ProfileMode } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+
+// Mirror your enums as unions instead of importing them
+type Role = "candidate" | "recruiter";
+type ProfileMode = "candidate" | "employer" | "both";
 
 type RegisterBody = {
   email?: string;
@@ -77,8 +81,8 @@ export async function POST(request: Request) {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
-        profileMode: user.profileMode,
+        role: user.role as Role,
+        profileMode: user.profileMode as ProfileMode,
       },
     });
   } catch (err) {
