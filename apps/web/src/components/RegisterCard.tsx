@@ -3,9 +3,12 @@
 
 import { useState, type FormEvent } from "react";
 
+type ProfileMode = "candidate" | "employer" | "both";
+
 export default function RegisterCard({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
+  const [profileMode, setProfileMode] = useState<ProfileMode>("candidate");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +23,7 @@ export default function RegisterCard({ onBack }: { onBack: () => void }) {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pwd }),
+        body: JSON.stringify({ email, password: pwd, profileMode }),
       });
 
       const data = (await res.json().catch(() => null)) as
@@ -84,6 +87,37 @@ export default function RegisterCard({ onBack }: { onBack: () => void }) {
             placeholder="••••••••"
             required
           />
+        </div>
+
+        {/* Profile type selector */}
+        <div className="mt-4">
+          <p className="mb-1 text-xs font-medium text-gray-700">Profile type</p>
+          <div className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white p-1 text-xs">
+            {[
+              { key: "candidate", label: "Candidate" },
+              { key: "employer", label: "Employer" },
+              { key: "both", label: "Both" },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setProfileMode(opt.key as ProfileMode)}
+                className={[
+                  "rounded-lg px-3 py-1 font-medium transition",
+                  profileMode === opt.key
+                    ? "bg-gray-900 text-white"
+                    : "text-gray-700 hover:bg-gray-100",
+                ].join(" ")}
+                aria-pressed={profileMode === opt.key}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">
+            This controls what you’ll see in discovery: jobs, employers, or
+            both. You can tweak it later on your profile.
+          </p>
         </div>
 
         {error && (

@@ -4,10 +4,16 @@
 import { useState, type FormEvent } from "react";
 
 type Role = "candidate" | "recruiter";
+type ProfileMode = "candidate" | "employer" | "both";
 
 type LoginSuccess = {
   ok: true;
-  user: { username: string; role: Role };
+  user: {
+    id: string;
+    email: string;
+    role: Role;
+    profileMode: ProfileMode;
+  };
   remember: boolean;
   token?: string;
 };
@@ -22,11 +28,13 @@ type LoginResponse = LoginSuccess | LoginError;
 export default function LoginPage({
   onLogin,
 }: {
-  onLogin: (role: Role, remember: boolean) => void;
+  onLogin: (
+    user: { role: Role; profileMode: ProfileMode },
+    remember: boolean
+  ) => void;
 }) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("candidate");
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,18 +46,13 @@ export default function LoginPage({
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, role, remember }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = (await res.json().catch(() => null)) as
-        | LoginResponse
-        | null;
+      const data = (await res.json().catch(() => null)) as LoginResponse | null;
 
       const isError =
-        !res.ok ||
-        data === null ||
-        !("ok" in data) ||
-        data.ok !== true;
+        !res.ok || data === null || !("ok" in data) || data.ok !== true;
 
       if (isError) {
         const errorMessage =
@@ -60,8 +63,14 @@ export default function LoginPage({
         return;
       }
 
-      // Success: let the parent know
-      onLogin(role, remember);
+      // success – let parent know (role + profileMode from backend)
+      onLogin(
+        {
+          role: data.user.role,
+          profileMode: data.user.profileMode,
+        },
+        remember
+      );
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
@@ -84,44 +93,25 @@ export default function LoginPage({
 
         <h1 className="text-xl font-semibold text-white">Welcome back</h1>
         <p className="mt-1 text-sm text-white/80">
-          Sign in and choose your role to tailor the experience.
+          Sign in to see your matches and update your profile.
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
-          {/* Role selector */}
-          <div className="inline-grid grid-cols-2 overflow-hidden rounded-xl ring-1 ring-white/20 bg-white/10 backdrop-blur">
-            {(["candidate", "recruiter"] as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={[
-                  "px-4 py-2 text-sm transition",
-                  role === r
-                    ? "bg-white text-gray-900"
-                    : "text-white/90 hover:bg-white/10",
-                ].join(" ")}
-                aria-pressed={role === r}
-              >
-                {r[0].toUpperCase() + r.slice(1)}
-              </button>
-            ))}
-          </div>
-
           <div>
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="mb-1 block text-xs font-medium text-white/80"
             >
-              Username
+              Email
             </label>
             <input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-white/20 bg-white/90 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40"
-              placeholder="Enter your username"
-              autoComplete="username"
+              placeholder="you@example.com"
+              autoComplete="email"
               required
             />
           </div>
@@ -175,7 +165,7 @@ export default function LoginPage({
           </button>
 
           <p className="text-center text-xs text-white/80 mt-2">
-            Demo: <span className="font-mono">admin</span> /{" "}
+            Demo: <span className="font-mono">admin@example.com</span> /{" "}
             <span className="font-mono">password123</span>
           </p>
         </form>
