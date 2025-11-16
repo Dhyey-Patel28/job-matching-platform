@@ -14,9 +14,16 @@ type Role = "candidate" | "recruiter";
 type ProfileMode = "candidate" | "employer" | "both";
 type View = "landing" | "login" | "register" | "profile" | "discover";
 
+type LoginUser = {
+  id: string;
+  role: Role;
+  profileMode: ProfileMode;
+};
+
 export default function AppPage() {
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [profileMode, setProfileMode] = useState<ProfileMode>("candidate");
 
@@ -42,32 +49,40 @@ export default function AppPage() {
     const storedMode = localStorage.getItem("profileMode") as
       | ProfileMode
       | null;
+    const storedId = localStorage.getItem("userId");
 
-    if (remembered === "true" && role) {
+    if (remembered === "true" && role && storedId) {
       setIsLoggedIn(true);
+      setUserId(storedId);
       setUserRole(role);
       setProfileMode(
         storedMode ?? (role === "candidate" ? "candidate" : "employer"),
       );
-      // Returning visitors go straight to discovery; they can jump to Profile later
+      // Returning visitors go straight to discovery
       setView("discover");
     } else {
+      setIsLoggedIn(false);
+      setUserId(null);
+      setUserRole(null);
       setView("landing");
     }
     setLoading(false);
   }, []);
 
-  const handleLogin = (
-    user: { role: Role; profileMode: ProfileMode },
-    remember: boolean,
-  ) => {
-    const { role, profileMode } = user;
+  const handleLogin = (user: LoginUser, remember: boolean) => {
+    const { id, role, profileMode } = user;
 
+    // Persist basic auth info
+    localStorage.setItem("userId", id);
     localStorage.setItem("role", role);
     localStorage.setItem("profileMode", profileMode);
-    if (remember) localStorage.setItem("isAuthenticated", "true");
-    else localStorage.removeItem("isAuthenticated");
+    if (remember) {
+      localStorage.setItem("isAuthenticated", "true");
+    } else {
+      localStorage.removeItem("isAuthenticated");
+    }
 
+    setUserId(id);
     setUserRole(role);
     setProfileMode(profileMode);
     setIsLoggedIn(true);
@@ -81,10 +96,12 @@ export default function AppPage() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("userId");
     localStorage.removeItem("role");
     localStorage.removeItem("isAuthenticated");
-    // You can keep or clear profileMode here; for now we keep it.
+    // You can keep or clear profileMode here; for now we keep it in localStorage.
     setIsLoggedIn(false);
+    setUserId(null);
     setUserRole(null);
     setView("landing");
   };
@@ -121,9 +138,10 @@ export default function AppPage() {
         </div>
       )}
 
-      {view === "profile" && userRole && (
+      {view === "profile" && userRole && userId && (
         <div className="grid min-h-screen place-items-center px-4">
           <ProfileView
+            userId={userId}
             userRole={userRole}
             profileMode={profileMode}
             onProfileModeChange={handleProfileModeChange}

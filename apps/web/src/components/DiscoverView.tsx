@@ -1,6 +1,7 @@
+// apps/web/src/components/DiscoverView.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import SwipeDeck, { type SwipeDirection } from "@/components/SwipeDeck";
 import EmployerCard, { type Employer } from "@/components/EmployerCard";
 import JobCard, { type Job } from "@/components/JobCard";
@@ -21,14 +22,14 @@ function EndOfDeck({
   const rate = total ? Math.round((liked / total) * 100) : 0;
   return (
     <div className="grid h-full place-items-center">
-      <div className="rounded-2xl border bg-white/90 p-8 text-center shadow-sm">
-        <div className="text-3xl mb-1">🎉</div>
+      <div className="mx-auto rounded-2xl border bg-white/90 p-8 text-center shadow-sm">
+        <div className="mb-1 text-3xl">🎉</div>
         <h3 className="text-xl font-semibold">You’re all caught up!</h3>
         <p className="mt-1 text-sm text-gray-600">
           Nice work — here’s how you did.
         </p>
 
-        <div className="mt-6 grid max-w-md grid-cols-3 gap-4 mx-auto">
+        <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-4">
           <div className="rounded-xl border bg-white px-4 py-3">
             <div className="text-lg font-semibold">{total}</div>
             <div className="text-[11px] text-gray-600">Reviewed</div>
@@ -72,20 +73,20 @@ export default function DiscoverView({
   const [loading, setLoading] = useState(true);
 
   // Which decks are allowed for this profile mode?
-  const allowedTabs: Array<"jobs" | "employers"> =
-    profileMode === "candidate"
-      ? ["jobs"]
-      : profileMode === "employer"
-      ? ["employers"]
-      : ["jobs", "employers"];
+  const allowedTabs = useMemo<("jobs" | "employers")[]>(() => {
+    if (!userRole) return ["jobs", "employers"];
 
-  // Keep tab in sync with allowedTabs when profileMode changes
+    if (profileMode === "both") return ["jobs", "employers"];
+    if (userRole === "candidate") return ["jobs"];
+    return ["employers"];
+  }, [userRole, profileMode]);
+
+  // Keep tab in sync with allowedTabs when profileMode / userRole changes
   useEffect(() => {
     if (!allowedTabs.includes(tab)) {
       setTab(allowedTabs[0]);
     }
-    // allowedTabs depends only on profileMode, and tab is in deps
-  }, [profileMode, tab, allowedTabs]);
+  }, [allowedTabs, tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +176,7 @@ export default function DiscoverView({
   const showingJobs = tab === "jobs";
 
   return (
-    <div className="mx-auto grid h-[100dvh] max-w-6xl grid-rows-[auto_1fr_auto] gap-3 px-4 py-4 overflow-visible">
+    <div className="mx-auto grid h-[100dvh] max-w-6xl grid-rows-[auto_1fr_auto] gap-3 overflow-visible px-4 py-4">
       {/* Row 1: compact toolbar + centered context */}
       <header className="grid grid-cols-[1fr_auto_1fr] items-center">
         {/* Left: brand */}
@@ -241,14 +242,14 @@ export default function DiscoverView({
           <button
             type="button"
             onClick={onEditProfile}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px md:text-sm"
           >
             Profile
           </button>
           <button
             type="button"
             onClick={onLogout}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px md:text-sm"
           >
             Log out
           </button>
@@ -256,7 +257,7 @@ export default function DiscoverView({
       </header>
 
       {/* Row 2: deck */}
-      <div className="flex items-start justify-center pt-2 md:pt-4 overflow-visible">
+      <div className="flex items-start justify-center overflow-visible pt-2 md:pt-4">
         {loading ? (
           <div className="py-16 text-sm text-white/80">Loading matches…</div>
         ) : showingJobs ? (
