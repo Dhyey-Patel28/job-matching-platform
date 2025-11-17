@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import type { Candidate } from "@/components/CandidateCard";
-import type { CandidateProfile } from "@prisma/client";
+
+// Derive the row type from the Prisma client, so we don't depend on a
+// specific named export like `CandidateProfile` from @prisma/client.
+type CandidateProfileRow = Awaited<
+  ReturnType<(typeof prisma)["candidateProfile"]["findMany"]>
+>[number];
 
 /**
  * GET /api/candidates
@@ -14,14 +19,16 @@ export async function GET() {
       orderBy: { userId: "asc" },
     });
 
-    const candidates: Candidate[] = profiles.map((profile: CandidateProfile) => ({
-      id: profile.userId,
-      name: profile.fullName || "Anonymous candidate",
-      headline: profile.headline ?? undefined,
-      location: profile.location ?? undefined,
-      interests: profile.interests ?? undefined,
-      resumeUrl: profile.resumeUrl ?? undefined,
-    }));
+    const candidates: Candidate[] = profiles.map(
+      (profile: CandidateProfileRow) => ({
+        id: profile.userId,
+        name: profile.fullName || "Anonymous candidate",
+        headline: profile.headline ?? undefined,
+        location: profile.location ?? undefined,
+        interests: profile.interests ?? undefined,
+        resumeUrl: profile.resumeUrl ?? undefined,
+      }),
+    );
 
     return NextResponse.json({ candidates });
   } catch (err) {

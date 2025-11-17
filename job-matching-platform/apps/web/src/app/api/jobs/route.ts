@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { sampleJobs } from "@/data/sample";
 import type { Job } from "@/components/JobCard";
-
-// Derive EmployerProfile row type from Prisma client
-type EmployerProfileRow = Awaited<
-  ReturnType<(typeof prisma)["employerProfile"]["findMany"]>
->[number];
+import type { EmployerProfile } from "@prisma/client";
 
 /**
  * GET /api/jobs
@@ -24,7 +20,7 @@ export async function GET() {
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    const jobs: Job[] = profiles.map((profile: EmployerProfileRow) => {
+    const jobs: Job[] = profiles.map((profile: EmployerProfile) => {
       const tags =
         profile.hiringFor
           ?.split(/[,/]/)
