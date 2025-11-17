@@ -3,44 +3,39 @@ import { prisma } from "@/server/db";
 import { sampleJobs } from "@/data/sample";
 import type { Job } from "@/components/JobCard";
 
-// Derive EmployerProfile row type from Prisma client
-type EmployerProfileRow = Awaited<
-  ReturnType<(typeof prisma)["employerProfile"]["findMany"]>
->[number];
-
 /**
  * GET /api/jobs
  *
- * Returns job cards built from EmployerProfile rows.
- * If there are no employer profiles yet, falls back to the local sampleJobs.
+ * Returns job cards from the JobListing table.
+ * On first run, seeds the table from sampleJobs.
  */
 export async function GET() {
   try {
-    const profiles = await prisma.employerProfile.findMany({
-      orderBy: { userId: "asc" },
+    // Seed once, if needed
+    const existingCount = await prisma.jobListing.count();
+
+    if (existingCount === 0) {
+      const data = sampleJobs.map((job) => ({
+        payload: job, // whole Job object as JSON
+      }));
+
+      await prisma.jobListing.createMany({ data });
+    }
+
+    const rows = await prisma.jobListing.findMany({
+      orderBy: { createdAt: "desc" },
     });
 
-    if (!profiles.length) {
+    if (!rows.length) {
+      // Absolute fallback if DB is empty for some reason
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    const jobs: Job[] = profiles.map((profile: EmployerProfileRow) => {
-      const tags =
-        profile.hiringFor
-          ?.split(/[,/]/)
-          .map((tag: string) => tag.trim())
-          .filter(Boolean) ?? [];
+    type JobListingRow = Awaited<
+      ReturnType<(typeof prisma)["jobListing"]["findMany"]>
+    >[number];
 
-      return {
-        id: profile.userId,
-        title: profile.roleTitle || "Open role",
-        company: profile.companyName || "Unknown company",
-        location: profile.location || "Remote / flexible",
-        tags,
-        summary: tags.length ? `Hiring for: ${tags.join(", ")}` : undefined,
-      };
-    });
-
+    const jobs: Job[] = rows.map((row: JobListingRow) => row.payload as Job);
     return NextResponse.json({ jobs });
   } catch (err) {
     console.error("Error fetching jobs, falling back to samples:", err);
