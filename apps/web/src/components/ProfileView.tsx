@@ -1,3 +1,4 @@
+// src/components/ProfileView.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,12 +23,14 @@ type EmployerProfile = {
 };
 
 export default function ProfileView({
+  userId,
   userRole,
   profileMode,
   onProfileModeChange,
   onBackToDiscover,
   onLogout,
 }: {
+  userId: string;
   userRole: Role;
   profileMode: ProfileMode;
   onProfileModeChange: (mode: ProfileMode) => void;
@@ -58,6 +61,58 @@ export default function ProfileView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Hydrate from /api/profile on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/profile?userId=${encodeURIComponent(userId)}`,
+        );
+        const data = (await res.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              error?: string;
+              profile?: {
+                profileMode?: ProfileMode;
+                candidate?: CandidateProfile | null;
+                employer?: EmployerProfile | null;
+              } | null;
+            }
+          | null;
+
+        if (!res.ok || !data?.ok || cancelled) {
+          return;
+        }
+
+        if (data.profile?.candidate) {
+          setCandidate(data.profile.candidate);
+        }
+        if (data.profile?.employer) {
+          setEmployer(data.profile.employer);
+        }
+
+        // Keep profileMode in sync with DB the first time we load
+        if (
+          data.profile?.profileMode &&
+          data.profile.profileMode !== profileMode
+        ) {
+          onProfileModeChange(data.profile.profileMode);
+        }
+      } catch (err) {
+        console.error("Error loading profile in client:", err);
+        // Fail silently; user can still type and save
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, profileMode, onProfileModeChange]);
+
   // Keep activePanel in sync when you go to a single side
   useEffect(() => {
     if (profileMode === "candidate") setActivePanel("candidate");
@@ -65,10 +120,8 @@ export default function ProfileView({
     // when "both", keep the current activePanel as-is
   }, [profileMode]);
 
-  const hasCandidate =
-    profileMode === "candidate" || profileMode === "both";
-  const hasEmployer =
-    profileMode === "employer" || profileMode === "both";
+  const hasCandidate = profileMode === "candidate" || profileMode === "both";
+  const hasEmployer = profileMode === "employer" || profileMode === "both";
 
   const isCandidateVisible =
     hasCandidate && (profileMode !== "both" || activePanel === "candidate");
@@ -124,6 +177,7 @@ export default function ProfileView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId,
           profileMode,
           candidate: hasCandidate ? candidate : null,
           employer: hasEmployer ? employer : null,
@@ -138,23 +192,18 @@ export default function ProfileView({
         throw new Error(data?.error ?? "Failed to save profile.");
       }
 
-      setSavedMessage(
-        data.message ??
-          "Profile saved (demo backend – not yet persisted to a real DB).",
-      );
+      setSavedMessage(data.message ?? "Profile saved to database.");
       window.setTimeout(() => setSavedMessage(null), 2000);
     } catch (err) {
       console.error(err);
-      setErrorMessage(
-        "Could not save profile. This is a demo backend – wire it to your DB later.",
-      );
+      setErrorMessage("Could not save profile. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="mx-auto grid h-[100dvh] max-w-6xl grid-rows-[auto_1fr_auto] gap-3 px-4 py-4 overflow-visible">
+    <div className="mx-auto grid h-[100dvh] max-w-6xl grid-rows-[auto_1fr_auto] gap-3 overflow-visible px-4 py-4">
       {/* Row 1: header */}
       <header className="grid grid-cols-[1fr_auto_1fr] items-center">
         {/* Left: brand */}
@@ -183,14 +232,14 @@ export default function ProfileView({
           <button
             type="button"
             onClick={onBackToDiscover}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px md:text-sm"
           >
             Back to matches
           </button>
           <button
             type="button"
             onClick={onLogout}
-            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs md:text-sm text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px"
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur transition hover:bg-white/20 active:translate-y-px md:text-sm"
           >
             Log out
           </button>
@@ -198,15 +247,14 @@ export default function ProfileView({
       </header>
 
       {/* Row 2: content */}
-      <div className="flex items-start justify-center pt-4 md:pt-6 overflow-visible">
-        <div className="w-full max-w-3xl rounded-3xl bg-white/95 p-6 md:p-8 shadow-lg ring-1 ring-black/5">
+      <div className="flex items-start justify-center overflow-visible pt-4 md:pt-6">
+        <div className="w-full max-w-3xl rounded-3xl bg-white/95 p-6 shadow-lg ring-1 ring-black/5 md:p-8">
           <h1 className="text-xl font-semibold text-gray-900">
             Set up your profile
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            This is just the front-end shell. Later we’ll connect this to a real
-            database so students and employers can save rich profiles, resumes,
-            and photos.
+            Your details are stored for this account in the demo database. Later
+            you can plug in real authentication and richer profile fields.
           </p>
 
           {/* Role / profile-type config */}
@@ -256,7 +304,7 @@ export default function ProfileView({
 
             <p className="text-[11px] text-gray-500">
               This controls what you’ll see in discovery: jobs, employers, or
-              both. You can tweak it later without losing your details.
+              both.
             </p>
 
             {profileMode === "both" && (
@@ -271,7 +319,7 @@ export default function ProfileView({
                     type="button"
                     onClick={() => setActivePanel("candidate")}
                     disabled={activePanel === "candidate"}
-                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 disabled:opacity-50 disabled:cursor-default hover:border-gray-400"
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 disabled:cursor-default disabled:opacity-50 hover:border-gray-400"
                   >
                     ← Candidate
                   </button>
@@ -279,7 +327,7 @@ export default function ProfileView({
                     type="button"
                     onClick={() => setActivePanel("employer")}
                     disabled={activePanel === "employer"}
-                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 disabled:opacity-50 disabled:cursor-default hover:border-gray-400"
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 disabled:cursor-default disabled:opacity-50 hover:border-gray-400"
                   >
                     Employer →
                   </button>
@@ -309,7 +357,10 @@ export default function ProfileView({
                       type="text"
                       value={candidate.fullName}
                       onChange={(e) =>
-                        setCandidate({ ...candidate, fullName: e.target.value })
+                        setCandidate({
+                          ...candidate,
+                          fullName: e.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/15"
                       placeholder="Alex Student"
@@ -324,7 +375,10 @@ export default function ProfileView({
                       type="text"
                       value={candidate.headline}
                       onChange={(e) =>
-                        setCandidate({ ...candidate, headline: e.target.value })
+                        setCandidate({
+                          ...candidate,
+                          headline: e.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/15"
                       placeholder="CS student interested in quant finance and ML"
@@ -339,7 +393,10 @@ export default function ProfileView({
                       type="text"
                       value={candidate.location}
                       onChange={(e) =>
-                        setCandidate({ ...candidate, location: e.target.value })
+                        setCandidate({
+                          ...candidate,
+                          location: e.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/15"
                       placeholder="Ypsilanti, MI or Remote"
@@ -505,7 +562,7 @@ export default function ProfileView({
               )}
               {!errorMessage && !savedMessage && (
                 <p className="text-gray-500">
-                  Nothing is persisted yet — this just hits a demo API for now.
+                  Your profile is stored for this account in the demo database.
                 </p>
               )}
             </div>
@@ -514,7 +571,7 @@ export default function ProfileView({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:shadow-md active:translate-y-px disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:shadow-md active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 md:text-sm"
             >
               {saving ? "Saving…" : "Save profile"}
             </button>

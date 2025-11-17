@@ -1,18 +1,30 @@
-# General
+# General OS junk
 .DS_Store
 Thumbs.db
+
+# Logs / temp
 *.log
 *.tmp
 *.swp
+
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
 .venv/
+__pycache__/
+*.pyc
+
+# Node / JS
 node_modules/
 dist/
 build/
 coverage/
-__pycache__/
-*.pyc
 
-# Editors
+# Editors / IDE
 .vscode/
 .idea/

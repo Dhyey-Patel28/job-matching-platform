@@ -1,45 +1,91 @@
 // apps/web/src/app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/server/db";
 
-type ProfileMode = "candidate" | "employer" | "both";
+type RegisterBody = {
+  email?: string;
+  password?: string;
+  profileMode?: "candidate" | "employer" | "both";
+};
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  let body: RegisterBody;
+
   try {
-    const body = (await request.json()) as {
-      email?: string;
-      password?: string;
-      profileMode?: ProfileMode | string;
-    };
+    body = (await req.json()) as RegisterBody;
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid JSON body." },
+      { status: 400 },
+    );
+  }
 
-    if (!body.email || !body.password) {
+  const email = body.email?.trim().toLowerCase();
+  const password = body.password ?? "";
+  const profileMode = body.profileMode ?? "candidate";
+
+  if (!email || !password) {
+    return NextResponse.json(
+      { ok: false, error: "Email and password are required." },
+      { status: 400 },
+    );
+  }
+
+  if (password.length < 8) {
+    return NextResponse.json(
+      { ok: false, error: "Password must be at least 8 characters." },
+      { status: 400 },
+    );
+  }
+
+  if (!["candidate", "employer", "both"].includes(profileMode)) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid profile mode." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        // For now all signups are "candidate"; you can extend later.
+        role: "candidate",
+        profileMode,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        message: "Registration successful. You can now sign in.",
+      },
+      { status: 200 },
+    );
+  } catch (err: unknown) {
+    console.error("Error during registration:", err);
+
+    // Don’t depend on PrismaClientKnownRequestError type – just
+    // check the error code in a type-safe-ish way.
+    const maybePrismaError = err as { code?: string };
+
+    if (maybePrismaError && maybePrismaError.code === "P2002") {
       return NextResponse.json(
-        { ok: false, error: "Email and password are required." },
-        { status: 400 },
+        {
+          ok: false,
+          error: "An account with that email already exists.",
+        },
+        { status: 409 },
       );
     }
 
-    const allowed: ProfileMode[] = ["candidate", "employer", "both"];
-    const mode: ProfileMode =
-      body.profileMode && allowed.includes(body.profileMode as ProfileMode)
-        ? (body.profileMode as ProfileMode)
-        : "candidate";
-
-    // In a real app, insert the user + profileMode into your DB here.
-    // For now we just echo back a success payload.
-    return NextResponse.json({
-      ok: true,
-      message:
-        "Registration accepted (demo). profileMode has been recorded in the payload only.",
-      user: {
-        email: body.email,
-        profileMode: mode,
-      },
-    });
-  } catch (err) {
-    console.error(err);
     return NextResponse.json(
-      { ok: false, error: "Invalid request body." },
-      { status: 400 },
+      { ok: false, error: "Failed to register. Please try again later." },
+      { status: 500 },
     );
   }
 }

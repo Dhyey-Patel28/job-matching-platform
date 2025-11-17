@@ -1,50 +1,88 @@
 // apps/web/src/app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/server/db";
 
-const DEMO_USERNAME = "admin";
-const DEMO_PASSWORD = "password123";
+// Mirror your Prisma enums as simple string unions
+type Role = "candidate" | "recruiter";
+type ProfileMode = "candidate" | "employer" | "both";
+
+type LoginBody = {
+  email?: string;
+  password?: string;
+  remember?: boolean;
+};
+
+type LoginUserPayload = {
+  id: string;
+  email: string;
+  role: Role;
+  profileMode: ProfileMode;
+};
 
 export async function POST(request: Request) {
-  let body: unknown;
+  let body: LoginBody;
 
   try {
-    body = await request.json();
+    body = (await request.json()) as LoginBody;
   } catch {
     return NextResponse.json(
-      { error: "Invalid JSON body." },
+      { ok: false, error: "Invalid JSON body." },
       { status: 400 },
     );
   }
 
-  const { username, password, role, remember } = body as {
-    username?: string;
-    password?: string;
-    role?: "candidate" | "recruiter";
-    remember?: boolean;
-  };
+  const email = body.email?.trim().toLowerCase();
+  const password = body.password;
 
-  if (!username || !password || !role) {
+  if (!email || !password) {
     return NextResponse.json(
-      { error: "username, password, and role are required." },
+      { ok: false, error: "Email and password are required." },
       { status: 400 },
     );
   }
 
-  if (username !== DEMO_USERNAME || password !== DEMO_PASSWORD) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email or password." },
+        { status: 401 },
+      );
+    }
+
+    const passwordOk = await bcrypt.compare(password, user.passwordHash);
+
+    if (!passwordOk) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email or password." },
+        { status: 401 },
+      );
+    }
+
+    const payload: LoginUserPayload = {
+      id: user.id,
+      email: user.email,
+      role: user.role as Role,
+      profileMode: user.profileMode as ProfileMode,
+    };
+
+    // Still a stateless demo: frontend stores this in localStorage.
+    // Later you can add secure cookies / JWT here.
+    return NextResponse.json({
+      ok: true,
+      user: payload,
+      remember: !!body.remember,
+      token: "demo-token-not-secure",
+    });
+  } catch (err) {
+    console.error("Login error:", err);
     return NextResponse.json(
-      { error: "Invalid username or password." },
-      { status: 401 },
+      { ok: false, error: "Failed to sign in. Please try again." },
+      { status: 500 },
     );
   }
-
-  // For now this is a stateless demo. Later you can return a signed JWT, set cookies, etc.
-  return NextResponse.json({
-    ok: true,
-    user: {
-      username,
-      role,
-    },
-    remember: !!remember,
-    token: "demo-token-not-secure", // <-- placeholder
-  });
 }

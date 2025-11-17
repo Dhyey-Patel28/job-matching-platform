@@ -1,5 +1,6 @@
 // src/components/EmployerCard.tsx
 'use client';
+import Link from 'next/link';
 import Card from './Card';
 
 function initials(name: string) {
@@ -104,7 +105,7 @@ export default function EmployerCard({ employer }: { employer: Employer }) {
 
       {/* Footer */}
       <div className="mt-auto flex items-center justify-end gap-2 pt-4">
-        <a
+        <Link
           className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm hover:shadow-sm active:translate-y-px"
           onPointerDown={(e) => e.stopPropagation()}
           href={employer.website || '#'}
@@ -112,7 +113,7 @@ export default function EmployerCard({ employer }: { employer: Employer }) {
           rel="noreferrer"
         >
           Website
-        </a>
+        </Link>
         <button
           className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white hover:shadow-sm active:translate-y-px"
           onPointerDown={(e) => e.stopPropagation()}

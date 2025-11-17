@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 
 type Role = "candidate" | "recruiter";
 type ProfileMode = "candidate" | "employer" | "both";
@@ -29,8 +30,8 @@ export default function LoginPage({
   onLogin,
 }: {
   onLogin: (
-    user: { role: Role; profileMode: ProfileMode },
-    remember: boolean
+    user: { id: string; role: Role; profileMode: ProfileMode },
+    remember: boolean,
   ) => void;
 }) {
   const [email, setEmail] = useState("");
@@ -46,7 +47,7 @@ export default function LoginPage({
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, remember }),
       });
 
       const data = (await res.json().catch(() => null)) as LoginResponse | null;
@@ -63,13 +64,14 @@ export default function LoginPage({
         return;
       }
 
-      // success – let parent know (role + profileMode from backend)
+      // success – let parent know (id + role + profileMode from backend)
       onLogin(
         {
+          id: data.user.id,
           role: data.user.role,
           profileMode: data.user.profileMode,
         },
-        remember
+        remember,
       );
     } catch (err) {
       console.error(err);
@@ -145,12 +147,11 @@ export default function LoginPage({
               />
               Remember me
             </label>
-            <a
-              href="#"
-              className="text-white/90 underline-offset-2 hover:underline"
-            >
-              Forgot password?
-            </a>
+            <p className="mt-2 text-[11px] text-white/80">
+              <Link href="/forgot-password" className="font-medium underline">
+                Forgot your password?
+              </Link>
+            </p>
           </div>
 
           {error && (
@@ -164,7 +165,7 @@ export default function LoginPage({
             Sign in
           </button>
 
-          <p className="text-center text-xs text-white/80 mt-2">
+          <p className="mt-2 text-center text-xs text-white/80">
             Demo: <span className="font-mono">admin@example.com</span> /{" "}
             <span className="font-mono">password123</span>
           </p>
