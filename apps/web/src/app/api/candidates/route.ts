@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import type { Candidate } from "@/components/CandidateCard";
+import type { CandidateProfile } from "@prisma/client";
 
 /**
  * GET /api/candidates
@@ -13,7 +14,7 @@ export async function GET() {
       orderBy: { userId: "asc" },
     });
 
-    const candidates: Candidate[] = profiles.map((profile) => ({
+    const candidates: Candidate[] = profiles.map((profile: CandidateProfile) => ({
       id: profile.userId,
       name: profile.fullName || "Anonymous candidate",
       headline: profile.headline ?? undefined,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/db";
 import { sampleEmployers } from "@/data/sample";
+import { prisma } from "@/server/db";
 import type { Employer } from "@/components/EmployerCard";
 
 export async function GET() {
@@ -10,11 +10,10 @@ export async function GET() {
     if (existingCount === 0) {
       // Seed DB once with sample employers.
       const data = sampleEmployers.map((employer) => ({
-        payload: employer as unknown,
+        payload: employer,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await prisma.employerListing.createMany({ data: data as any });
+      await prisma.employerListing.createMany({ data });
     }
 
     const rows = await prisma.employerListing.findMany({
@@ -22,12 +21,11 @@ export async function GET() {
     });
 
     if (!rows.length) {
-      // Fallback if something went wrong with seeding
       return NextResponse.json({ employers: sampleEmployers });
     }
 
-    const employers: Employer[] = rows.map(
-      (row) => row.payload as Employer,
+    const employers = rows.map(
+      (row: { payload: unknown }) => row.payload as Employer,
     );
 
     return NextResponse.json({ employers });

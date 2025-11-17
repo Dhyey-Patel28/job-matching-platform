@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { sampleJobs } from "@/data/sample";
 import type { Job } from "@/components/JobCard";
+import type { EmployerProfile } from "@prisma/client";
 
 /**
  * GET /api/jobs
@@ -19,11 +20,11 @@ export async function GET() {
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    const jobs: Job[] = profiles.map((profile) => {
+    const jobs: Job[] = profiles.map((profile: EmployerProfile) => {
       const tags =
         profile.hiringFor
           ?.split(/[,/]/)
-          .map((tag) => tag.trim())
+          .map((tag: string) => tag.trim())
           .filter(Boolean) ?? [];
 
       return {
