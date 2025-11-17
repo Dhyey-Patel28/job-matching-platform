@@ -31,7 +31,11 @@ export async function GET() {
       return NextResponse.json({ jobs: sampleJobs });
     }
 
-    const jobs: Job[] = rows.map((row) => row.payload as Job);
+    type JobListingRow = Awaited<
+      ReturnType<(typeof prisma)["jobListing"]["findMany"]>
+    >[number];
+
+    const jobs: Job[] = rows.map((row: JobListingRow) => row.payload as Job);
     return NextResponse.json({ jobs });
   } catch (err) {
     console.error("Error fetching jobs, falling back to samples:", err);
