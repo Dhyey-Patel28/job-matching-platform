@@ -1,38 +1,35 @@
+// apps/web/src/app/api/candidates/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import type { Candidate } from "@/components/CandidateCard";
 
-// Derive the row type from the Prisma client, so we don't depend on a
-// specific named export like `CandidateProfile` from @prisma/client.
-type CandidateProfileRow = Awaited<
-  ReturnType<(typeof prisma)["candidateProfile"]["findMany"]>
->[number];
-
-/**
- * GET /api/candidates
- *
- * Returns candidate cards built from CandidateProfile rows.
- */
 export async function GET() {
   try {
-    const profiles = await prisma.candidateProfile.findMany({
-      orderBy: { userId: "asc" },
+    const rows = await prisma.user.findMany({
+      where: {
+        candidateProfile: { isNot: null },
+      },
+      include: { candidateProfile: true },
     });
 
-    const candidates: Candidate[] = profiles.map(
-      (profile: CandidateProfileRow) => ({
-        id: profile.userId,
-        name: profile.fullName || "Anonymous candidate",
-        headline: profile.headline ?? undefined,
-        location: profile.location ?? undefined,
-        interests: profile.interests ?? undefined,
-        resumeUrl: profile.resumeUrl ?? undefined,
-      }),
-    );
+    const candidates: Candidate[] = rows.map((row) => {
+      const p = row.candidateProfile;
+      return {
+        id: row.id,
+        name: p?.fullName || row.email,
+        headline: p?.headline || undefined,
+        location: p?.location || undefined,
+        interests: p?.interests || undefined,
+        resumeUrl: p?.resumeUrl || undefined,
+      };
+    });
 
-    return NextResponse.json({ candidates });
+    return NextResponse.json({ ok: true, candidates });
   } catch (err) {
-    console.error("Error fetching candidates:", err);
-    return NextResponse.json({ candidates: [] });
+    console.error("Error loading candidates:", err);
+    return NextResponse.json(
+      { ok: false, error: "Failed to load candidates." },
+      { status: 500 },
+    );
   }
 }
