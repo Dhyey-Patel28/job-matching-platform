@@ -151,14 +151,16 @@ export default function AppPage() {
         </div>
       )}
 
-      {view === "discover" && (
+      {view === "discover" && userId && (
         <DiscoverView
+          userId={userId}
           userRole={userRole}
           profileMode={profileMode}
           onLogout={handleLogout}
           onEditProfile={() => setView("profile")}
         />
       )}
+
     </main>
   );
 }

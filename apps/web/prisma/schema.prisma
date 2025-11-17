@@ -19,21 +19,22 @@ enum ProfileMode {
 }
 
 model User {
-  id           String       @id @default(uuid())
-  email        String       @unique
+  id           String      @id @default(uuid())
+  email        String      @unique
   passwordHash String
   role         Role
   profileMode  ProfileMode
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime    @default(now())
 
   candidateProfile    CandidateProfile?
   employerProfile     EmployerProfile?
   passwordResetTokens PasswordResetToken[]
+  swipes              Swipe[]
 }
 
 model CandidateProfile {
-  userId    String @id
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   fullName  String?
   headline  String?
@@ -43,8 +44,8 @@ model CandidateProfile {
 }
 
 model EmployerProfile {
-  userId      String @id
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   companyName String?
   roleTitle   String?
@@ -77,4 +78,28 @@ model PasswordResetToken {
   used      Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum SwipeDirection {
+  left
+  right
+}
+
+enum SwipeTargetType {
+  job
+  candidate
+}
+
+model Swipe {
+  id         String          @id @default(uuid())
+  userId     String
+  targetType SwipeTargetType
+  targetId   String
+  direction  SwipeDirection
+  createdAt  DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId, targetType, targetId])
 }

@@ -52,11 +52,13 @@ function EndOfDeck({
 }
 
 export default function DiscoverView({
+  userId,
   userRole,
   profileMode,
   onLogout,
   onEditProfile,
 }: {
+  userId: string;
   userRole: Role | null;
   profileMode: ProfileMode;
   onLogout: () => void;
@@ -145,6 +147,20 @@ export default function DiscoverView({
       liked: s.liked + (dir === "right" ? 1 : 0),
       noped: s.noped + (dir === "left" ? 1 : 0),
     }));
+
+    // Fire-and-forget: record swipe in DB
+    fetch("/api/swipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        targetType: "job",
+        targetId: item.id,
+        direction: dir,
+      }),
+    }).catch((err) => {
+      console.error("Failed to record job swipe:", err);
+    });
   };
 
   const onSwipeCandidate = (dir: SwipeDirection, item: Candidate) => {
@@ -155,6 +171,19 @@ export default function DiscoverView({
       liked: s.liked + (dir === "right" ? 1 : 0),
       noped: s.noped + (dir === "left" ? 1 : 0),
     }));
+
+    fetch("/api/swipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        targetType: "candidate",
+        targetId: item.id,
+        direction: dir,
+      }),
+    }).catch((err) => {
+      console.error("Failed to record candidate swipe:", err);
+    });
   };
 
   const jobEmpty = (

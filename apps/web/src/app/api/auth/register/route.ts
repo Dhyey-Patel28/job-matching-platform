@@ -48,13 +48,13 @@ export async function POST(req: Request) {
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
+    const role = profileMode === "candidate" ? "candidate" : "recruiter";
 
     await prisma.user.create({
       data: {
         email,
         passwordHash,
-        // For now all signups are "candidate"; you can extend later.
-        role: "candidate",
+        role,
         profileMode,
       },
     });
