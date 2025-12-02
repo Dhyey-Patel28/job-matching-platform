@@ -1,14 +1,15 @@
 // apps/web/src/app/reset-password/page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppBackground from "@/components/AppBackground";
 
-export default function ResetPasswordPage() {
+function ResetPasswordInner() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams.get("token") ?? "";
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -154,5 +155,21 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="grid min-h-screen place-items-center bg-slate-950 px-4">
+          <div className="text-sm text-white/70">
+            Loading reset password…
+          </div>
+        </main>
+      }
+    >
+      <ResetPasswordInner />
+    </Suspense>
   );
 }
