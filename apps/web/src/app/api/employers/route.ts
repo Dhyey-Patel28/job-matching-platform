@@ -1,36 +1,42 @@
+// apps/web/src/app/api/employers/route.ts
 import { NextResponse } from "next/server";
-import { sampleEmployers } from "@/data/sample";
 import { prisma } from "@/server/db";
+import { sampleEmployers } from "@/data/sample";
 import type { Employer } from "@/components/EmployerCard";
 
 export async function GET() {
   try {
-    const existingCount = await prisma.employerListing.count();
-
-    if (existingCount === 0) {
-      // Seed DB once with sample employers.
-      const data = sampleEmployers.map((employer) => ({
-        payload: employer,
-      }));
-
-      await prisma.employerListing.createMany({ data });
-    }
-
-    const rows = await prisma.employerListing.findMany({
-      orderBy: { createdAt: "desc" },
+    const profiles = await prisma.employerProfile.findMany({
+      include: {
+        jobs: true,
+      },
     });
 
-    if (!rows.length) {
+    if (!profiles.length) {
       return NextResponse.json({ employers: sampleEmployers });
     }
 
-    const employers = rows.map(
-      (row: { payload: unknown }) => row.payload as Employer,
-    );
+    const employers: Employer[] = profiles.map((profile) => {
+      const openRoles = profile.jobs.filter(
+        (job) => job.status === "open" && job.isPublic,
+      ).length;
+
+      return {
+        id: profile.userId,
+        name: profile.companyName || "Unnamed company",
+        industry: profile.hiringFor || "Various roles",
+        openRoles,
+        rating: undefined,
+        location: profile.location || "Remote / flexible",
+        about: undefined,
+        benefits: [],
+        website: profile.website || undefined,
+      };
+    });
 
     return NextResponse.json({ employers });
-  } catch (err) {
-    console.error("Error fetching employers, falling back to samples:", err);
+  } catch (error) {
+    console.error("Error fetching employers, falling back to samples:", error);
     return NextResponse.json({ employers: sampleEmployers });
   }
 }

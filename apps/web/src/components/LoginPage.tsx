@@ -1,4 +1,4 @@
-// src/components/LoginPage.tsx
+// apps/web/src/components/LoginPage.tsx
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -14,34 +14,38 @@ type LoginSuccess = {
     email: string;
     role: Role;
     profileMode: ProfileMode;
+    emailVerified?: boolean;
   };
-  remember: boolean;
-  token?: string;
 };
 
 type LoginError = {
   ok?: false;
   error?: string;
+  needsVerification?: boolean;
 };
 
 type LoginResponse = LoginSuccess | LoginError;
 
 export default function LoginPage({
   onLogin,
+  onShowRegister,
 }: {
   onLogin: (
     user: { id: string; role: Role; profileMode: ProfileMode },
     remember: boolean,
   ) => void;
+  onShowRegister?: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+    setError(null);
+    setSubmitting(true);
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -52,19 +56,45 @@ export default function LoginPage({
 
       const data = (await res.json().catch(() => null)) as LoginResponse | null;
 
+      // Special case: unverified email
+      if (
+        res.status === 403 &&
+        data &&
+        "needsVerification" in data &&
+        (data as LoginError).needsVerification
+      ) {
+        setError(
+          data.error ||
+            "Please verify your email before signing in. Check your inbox for a verification link.",
+        );
+        setPassword("");
+        setSubmitting(false);
+        return;
+      }
+
       const isError =
         !res.ok || data === null || !("ok" in data) || data.ok !== true;
 
       if (isError) {
-        const errorMessage =
-          data && "error" in data && data.error
-            ? data.error
-            : "Failed to sign in. Please try again.";
-        setError(errorMessage);
+        const maybeError = data && "error" in data ? data.error : null;
+        setError(
+          maybeError ||
+            "Invalid email or password. Double-check your details and try again.",
+        );
+        setPassword("");
+        setSubmitting(false);
         return;
       }
 
-      // success – let parent know (id + role + profileMode from backend)
+      // Success
+      setError(null);
+      setEmail("");
+      setPassword("");
+      window.localStorage.setItem(
+        "jmp:demo:remember-email",
+        remember ? email : "",
+      );
+
       onLogin(
         {
           id: data.user.id,
@@ -76,6 +106,8 @@ export default function LoginPage({
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -155,20 +187,34 @@ export default function LoginPage({
           </div>
 
           {error && (
-            <p className="text-sm font-medium text-rose-100">{error}</p>
+            <p className="text-xs font-medium text-rose-100">{error}</p>
           )}
 
           <button
             type="submit"
-            className="mt-2 w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition hover:shadow-md active:translate-y-px"
+            disabled={submitting}
+            className="mt-2 w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 active:translate-y-px"
           >
-            Sign in
+            {submitting ? "Signing in…" : "Sign in"}
           </button>
 
           <p className="mt-2 text-center text-xs text-white/80">
             Demo: <span className="font-mono">admin@example.com</span> /{" "}
             <span className="font-mono">password123</span>
           </p>
+
+          {onShowRegister && (
+            <p className="mt-3 text-center text-xs text-white/80">
+              New here?{" "}
+              <button
+                type="button"
+                onClick={onShowRegister}
+                className="font-semibold underline"
+              >
+                Create an account
+              </button>
+            </p>
+          )}
         </form>
       </div>
     </div>

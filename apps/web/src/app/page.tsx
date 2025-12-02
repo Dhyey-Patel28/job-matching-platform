@@ -18,6 +18,7 @@ type LoginUser = {
   id: string;
   role: Role;
   profileMode: ProfileMode;
+  emailVerified?: boolean;
 };
 
 export default function AppPage() {
@@ -26,10 +27,14 @@ export default function AppPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [profileMode, setProfileMode] = useState<ProfileMode>("candidate");
+  const [emailVerified, setEmailVerified] = useState<boolean | undefined>(undefined);
 
   // UI state
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("landing");
+
+  // Toast
+  const [toast, setToast] = useState<string | null>(null);
 
   // Splash once per tab
   const [showSplash, setShowSplash] = useState(false);
@@ -70,7 +75,7 @@ export default function AppPage() {
   }, []);
 
   const handleLogin = (user: LoginUser, remember: boolean) => {
-    const { id, role, profileMode } = user;
+    const { id, role, profileMode, emailVerified: verifiedFlag } = user;
 
     // Persist basic auth info
     localStorage.setItem("userId", id);
@@ -85,6 +90,9 @@ export default function AppPage() {
     setUserId(id);
     setUserRole(role);
     setProfileMode(profileMode);
+    setEmailVerified(
+      typeof verifiedFlag === "boolean" ? verifiedFlag : undefined,
+    );
     setIsLoggedIn(true);
     // After a fresh login, send them to profile setup first
     setView("profile");
@@ -95,15 +103,24 @@ export default function AppPage() {
     localStorage.setItem("profileMode", mode);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      console.error("Failed to hit logout API", e);
+    }
+
     localStorage.removeItem("userId");
     localStorage.removeItem("role");
     localStorage.removeItem("isAuthenticated");
-    // You can keep or clear profileMode here; for now we keep it in localStorage.
     setIsLoggedIn(false);
     setUserId(null);
     setUserRole(null);
+    setEmailVerified(undefined);
     setView("landing");
+
+    setToast("You’ve been signed out.");
+    window.setTimeout(() => setToast(null), 2500);
   };
 
   const onExplore = () => setView(isLoggedIn ? "discover" : "login");
@@ -115,6 +132,14 @@ export default function AppPage() {
   return (
     <main className="relative min-h-screen overflow-hidden">
       <AppBackground />
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center">
+          <div className="pointer-events-auto rounded-full bg-black/80 px-4 py-2 text-xs font-medium text-white shadow-lg">
+            {toast}
+          </div>
+        </div>
+      )}
 
       {showSplash && <Splash onFinish={finishSplash} brand="Job Matching" />}
 
@@ -128,7 +153,10 @@ export default function AppPage() {
 
       {view === "login" && (
         <div className="grid min-h-screen place-items-center px-4">
-          <LoginPage onLogin={handleLogin} />
+          <LoginPage
+            onLogin={handleLogin}
+            onShowRegister={() => setView("register")}
+          />
         </div>
       )}
 
@@ -147,13 +175,13 @@ export default function AppPage() {
             onProfileModeChange={handleProfileModeChange}
             onBackToDiscover={() => setView("discover")}
             onLogout={handleLogout}
+            emailVerified={emailVerified ?? undefined}
           />
         </div>
       )}
 
-      {view === "discover" && userId && (
+      {view === "discover" && userId && userRole && (
         <DiscoverView
-          userId={userId}
           userRole={userRole}
           profileMode={profileMode}
           onLogout={handleLogout}

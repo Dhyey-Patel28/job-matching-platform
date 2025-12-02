@@ -1,9 +1,8 @@
-// apps/web/src/app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db";
+import { signSession } from "@/server/auth";
 
-// Mirror your Prisma enums as simple string unions
 type Role = "candidate" | "recruiter";
 type ProfileMode = "candidate" | "employer" | "both";
 
@@ -13,34 +12,17 @@ type LoginBody = {
   remember?: boolean;
 };
 
-type LoginUserPayload = {
-  id: string;
-  email: string;
-  role: Role;
-  profileMode: ProfileMode;
-};
+export async function POST(req: Request) {
+  const body = (await req.json().catch(() => null)) as LoginBody | null;
 
-export async function POST(request: Request) {
-  let body: LoginBody;
-
-  try {
-    body = (await request.json()) as LoginBody;
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body." },
-      { status: 400 },
-    );
-  }
-
-  const email = body.email?.trim().toLowerCase();
-  const password = body.password;
-
-  if (!email || !password) {
+  if (!body?.email || !body?.password) {
     return NextResponse.json(
       { ok: false, error: "Email and password are required." },
       { status: 400 },
     );
   }
+
+  const email = body.email.toLowerCase();
 
   try {
     const user = await prisma.user.findUnique({
@@ -49,35 +31,61 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { ok: false, error: "Invalid email or password." },
+        { ok: false, error: "Invalid credentials." },
         { status: 401 },
       );
     }
 
-    const passwordOk = await bcrypt.compare(password, user.passwordHash);
-
-    if (!passwordOk) {
+    const ok = await bcrypt.compare(body.password, user.passwordHash);
+    if (!ok) {
       return NextResponse.json(
-        { ok: false, error: "Invalid email or password." },
+        { ok: false, error: "Invalid credentials." },
         { status: 401 },
       );
     }
 
-    const payload: LoginUserPayload = {
-      id: user.id,
+    // 🔴 require email verification
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        {
+          ok: false,
+          needsVerification: true,
+          error:
+            "Please verify your email before signing in. Check your email for a verification link.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const token = signSession({
+      sub: user.id,
       email: user.email,
       role: user.role as Role,
       profileMode: user.profileMode as ProfileMode,
-    };
-
-    // Still a stateless demo: frontend stores this in localStorage.
-    // Later you can add secure cookies / JWT here.
-    return NextResponse.json({
-      ok: true,
-      user: payload,
-      remember: !!body.remember,
-      token: "demo-token-not-secure",
+      emailVerified: user.emailVerified,
+      twoFactorPassed: true,
     });
+
+    const res = NextResponse.json({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role as Role,
+        profileMode: user.profileMode as ProfileMode,
+        emailVerified: user.emailVerified,
+      },
+    });
+
+    res.cookies.set("session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return res;
   } catch (err) {
     console.error("Login error:", err);
     return NextResponse.json(

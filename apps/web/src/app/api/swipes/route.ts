@@ -1,58 +1,54 @@
 // apps/web/src/app/api/swipes/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
+import { getSessionUser } from "@/server/auth";
 
-type Direction = "left" | "right";
-type TargetType = "job" | "candidate";
+type SwipeDirection = "left" | "right";
+type SwipeTargetType = "job" | "candidate";
 
-type SwipeBody = {
-  userId?: string;
-  targetType?: TargetType;
-  targetId?: string;
-  direction?: Direction;
-};
-
-export async function POST(request: Request) {
-  let body: SwipeBody;
-
-  try {
-    body = (await request.json()) as SwipeBody;
-  } catch {
+export async function POST(req: Request) {
+  const session = await getSessionUser();
+  if (!session) {
     return NextResponse.json(
-      { ok: false, error: "Invalid JSON body." },
-      { status: 400 },
+      { ok: false, error: "Not authenticated" },
+      { status: 401 },
     );
   }
 
-  const { userId, targetType, targetId, direction } = body;
+  const userId = session.sub;
 
-  if (!userId || !targetId || !targetType || !direction) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "userId, targetType, targetId, and direction are all required.",
-      },
-      { status: 400 },
-    );
-  }
+  const body = (await req.json()) as {
+    targetType?: SwipeTargetType;
+    targetId?: string;
+    direction?: SwipeDirection;
+  };
 
-  if (targetType !== "job" && targetType !== "candidate") {
+  const { targetType, targetId, direction } = body;
+
+  if (!targetType || !targetId || !direction) {
     return NextResponse.json(
-      { ok: false, error: "targetType must be 'job' or 'candidate'." },
+      { ok: false, error: "Missing swipe parameters" },
       { status: 400 },
     );
   }
 
   if (direction !== "left" && direction !== "right") {
     return NextResponse.json(
-      { ok: false, error: "direction must be 'left' or 'right'." },
+      { ok: false, error: "Invalid direction" },
+      { status: 400 },
+    );
+  }
+
+  if (targetType !== "job" && targetType !== "candidate") {
+    return NextResponse.json(
+      { ok: false, error: "Invalid target type" },
       { status: 400 },
     );
   }
 
   try {
-    await prisma.swipe.upsert({
+    // 1) Save / update the swipe itself
+    const swipe = await prisma.swipe.upsert({
       where: {
         userId_targetType_targetId: {
           userId,
@@ -72,11 +68,133 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true });
+    let matchCreated = false;
+    let matchId: string | null = null;
+    let conversationId: string | null = null;
+
+    // Only "right" swipes can create matches
+    if (swipe.direction === "right") {
+      // Candidate swiping on a Job
+      if (swipe.targetType === "job") {
+        const job = await prisma.job.findUnique({
+          where: { id: swipe.targetId },
+        });
+
+        if (job) {
+          // Has this employer already swiped right on this candidate?
+          const employerRightSwipe = await prisma.swipe.findFirst({
+            where: {
+              userId: job.employerUserId,
+              targetType: "candidate",
+              targetId: userId,
+              direction: "right",
+            },
+          });
+
+          if (employerRightSwipe) {
+            const match = await prisma.match.upsert({
+              where: {
+                candidateId_employerId_jobId: {
+                  candidateId: userId,
+                  employerId: job.employerUserId,
+                  jobId: job.id,
+                },
+              },
+              update: {},
+              create: {
+                candidateId: userId,
+                employerId: job.employerUserId,
+                jobId: job.id,
+              },
+            });
+
+            matchId = match.id;
+            matchCreated = true;
+
+            // Ensure a conversation exists
+            const convo = await prisma.conversation.upsert({
+              where: { matchId: match.id },
+              update: {},
+              create: { matchId: match.id },
+            });
+
+            conversationId = convo.id;
+          }
+        }
+      }
+
+      // Employer swiping on a Candidate
+      if (swipe.targetType === "candidate") {
+        const candidateId = swipe.targetId;
+
+        // All open jobs for this employer
+        const employerJobs = await prisma.job.findMany({
+          where: {
+            employerUserId: userId,
+            status: "open",
+          },
+          select: { id: true },
+        });
+
+        const employerJobIds = employerJobs.map((j) => j.id);
+
+        if (employerJobIds.length > 0) {
+          // Has the candidate swiped right on any of this employer's jobs?
+          const candidateRightSwipe = await prisma.swipe.findFirst({
+            where: {
+              userId: candidateId,
+              targetType: "job",
+              direction: "right",
+              targetId: { in: employerJobIds },
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (candidateRightSwipe) {
+            const jobId = candidateRightSwipe.targetId;
+
+            const match = await prisma.match.upsert({
+              where: {
+                candidateId_employerId_jobId: {
+                  candidateId,
+                  employerId: userId,
+                  jobId,
+                },
+              },
+              update: {},
+              create: {
+                candidateId,
+                employerId: userId,
+                jobId,
+              },
+            });
+
+            matchId = match.id;
+            matchCreated = true;
+
+            const convo = await prisma.conversation.upsert({
+              where: { matchId: match.id },
+              update: {},
+              create: { matchId: match.id },
+            });
+
+            conversationId = convo.id;
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      swipe,
+      matchCreated,
+      matchId,
+      conversationId,
+    });
   } catch (err) {
-    console.error("Error recording swipe:", err);
+    console.error("Error handling swipe:", err);
     return NextResponse.json(
-      { ok: false, error: "Failed to record swipe." },
+      { ok: false, error: "Failed to record swipe" },
       { status: 500 },
     );
   }
