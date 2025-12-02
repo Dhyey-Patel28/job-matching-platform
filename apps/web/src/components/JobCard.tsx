@@ -16,8 +16,12 @@ export type Job = {
   tags?: string[];
   postedAt?: string;
   summary?: string;
-  experienceLevel?: 'Intern' | 'Junior' | 'Mid' | 'Senior' | 'Lead';
-  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Internship';
+  experienceLevel?: "Intern" | "Junior" | "Mid" | "Senior" | "Lead";
+  employmentType?: string;
+
+  // NEW:
+  status?: "draft" | "open" | "closed";
+  isPublic?: boolean;
 };
 
 export default function JobCard({

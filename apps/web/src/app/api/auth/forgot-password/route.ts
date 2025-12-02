@@ -1,20 +1,12 @@
+// apps/web/src/app/api/auth/forgot-password/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/db";
 import crypto from "crypto";
+import { prisma } from "@/server/db";
+import { sendPasswordResetEmail } from "@/server/email";
 
-export async function POST(request: Request) {
-  let body: unknown;
-
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body." },
-      { status: 400 },
-    );
-  }
-
-  const { email } = body as { email?: string };
+export async function POST(req: Request) {
+  const body = (await req.json().catch(() => null)) as { email?: string } | null;
+  const email = body?.email?.trim().toLowerCase() ?? "";
 
   if (!email) {
     return NextResponse.json(
@@ -23,17 +15,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const normalized = email.trim().toLowerCase();
-
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: normalized },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
 
-    // Do NOT leak whether the user exists
+    // Security: never reveal whether the account exists
     if (!user) {
-      return NextResponse.json({ ok: true });
+      return NextResponse.json(
+        {
+          ok: true,
+          message:
+            "If an account exists for that email, you'll receive a reset link.",
+        },
+        { status: 200 },
+      );
     }
+
+    // Optional: invalidate any previous live tokens
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      data: { used: true },
+    });
 
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
@@ -46,16 +51,25 @@ export async function POST(request: Request) {
       },
     });
 
-    const resetUrl = `/reset-password?token=${encodeURIComponent(token)}`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-    // TODO in real life: send an email
-    // For dev, we just return the URL so you can click it
-    return NextResponse.json({
-      ok: true,
-      resetUrl,
-    });
+    await sendPasswordResetEmail(email, resetUrl);
+
+    return NextResponse.json(
+      {
+        ok: true,
+        message:
+          "If an account exists for that email, you'll receive a reset link.",
+        // Keep this for local dev convenience:
+        resetUrl:
+          process.env.NODE_ENV === "development" ? resetUrl : undefined,
+      },
+      { status: 200 },
+    );
   } catch (err) {
-    console.error("POST /api/auth/forgot-password error:", err);
+    console.error("Error in forgot-password:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to process request." },
       { status: 500 },

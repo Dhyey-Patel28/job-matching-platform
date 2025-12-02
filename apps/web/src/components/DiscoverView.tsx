@@ -52,13 +52,11 @@ function EndOfDeck({
 }
 
 export default function DiscoverView({
-  userId,
   userRole,
   profileMode,
   onLogout,
   onEditProfile,
 }: {
-  userId: string;
   userRole: Role | null;
   profileMode: ProfileMode;
   onLogout: () => void;
@@ -148,15 +146,14 @@ export default function DiscoverView({
       noped: s.noped + (dir === "left" ? 1 : 0),
     }));
 
-    // Fire-and-forget: record swipe in DB
+    // fire-and-forget – don't block UI on this
     fetch("/api/swipes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId,
         targetType: "job",
         targetId: item.id,
-        direction: dir,
+        direction: dir === "right" ? "right" : "left",
       }),
     }).catch((err) => {
       console.error("Failed to record job swipe:", err);
@@ -176,10 +173,9 @@ export default function DiscoverView({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId,
         targetType: "candidate",
         targetId: item.id,
-        direction: dir,
+        direction: dir === "right" ? "right" : "left",
       }),
     }).catch((err) => {
       console.error("Failed to record candidate swipe:", err);
@@ -193,6 +189,7 @@ export default function DiscoverView({
       noped={jobStats.noped}
     />
   );
+
   const candidateEmpty = (
     <EndOfDeck
       total={candidateStats.liked + candidateStats.noped}
@@ -200,6 +197,30 @@ export default function DiscoverView({
       noped={candidateStats.noped}
     />
   );
+  
+  const [activeThread, setActiveThread] = useState<{
+    id: string;
+    candidateId: string;
+    employerId: string;
+  } | null>(null);
+
+  // when a match happens:
+  async function handleMatch(candidateUserId: string, employerUserId: string) {
+    const res = await fetch("/api/chat/thread", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidateId: candidateUserId,
+        employerId: employerUserId,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok && data.thread) {
+      setActiveThread(data.thread);
+      // optionally also show your "It's a match!" overlay here
+    }
+  }
 
   const showingJobs = tab === "jobs";
 

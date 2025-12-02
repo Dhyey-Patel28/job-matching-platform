@@ -1,39 +1,40 @@
+// apps/web/src/app/api/auth/reset-password/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/db";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/server/db";
 
-export async function POST(request: Request) {
-  let body: unknown;
+type ResetBody = {
+  token?: string;
+  password?: string;
+};
 
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body." },
-      { status: 400 },
-    );
-  }
-
-  const { token, password } = body as {
-    token?: string;
-    password?: string;
-  };
+export async function POST(req: Request) {
+  const body = (await req.json().catch(() => null)) as ResetBody | null;
+  const token = body?.token ?? "";
+  const password = body?.password ?? "";
 
   if (!token || !password) {
     return NextResponse.json(
-      { ok: false, error: "token and password are required." },
+      { ok: false, error: "Missing token or password." },
+      { status: 400 },
+    );
+  }
+
+  if (password.length < 8) {
+    return NextResponse.json(
+      { ok: false, error: "Password must be at least 8 characters." },
       { status: 400 },
     );
   }
 
   try {
-    const tokenRow = await prisma.passwordResetToken.findUnique({
+    const record = await prisma.passwordResetToken.findUnique({
       where: { token },
     });
 
-    if (!tokenRow || tokenRow.used || tokenRow.expiresAt < new Date()) {
+    if (!record || record.used || record.expiresAt < new Date()) {
       return NextResponse.json(
-        { ok: false, error: "Invalid or expired token." },
+        { ok: false, error: "Invalid or expired reset token." },
         { status: 400 },
       );
     }
@@ -42,18 +43,21 @@ export async function POST(request: Request) {
 
     await prisma.$transaction([
       prisma.user.update({
-        where: { id: tokenRow.userId },
+        where: { id: record.userId },
         data: { passwordHash },
       }),
       prisma.passwordResetToken.update({
-        where: { id: tokenRow.id },
+        where: { id: record.id },
         data: { used: true },
       }),
     ]);
 
-    return NextResponse.json({ ok: true, message: "Password updated." });
+    return NextResponse.json(
+      { ok: true, message: "Password has been reset." },
+      { status: 200 },
+    );
   } catch (err) {
-    console.error("POST /api/auth/reset-password error:", err);
+    console.error("Error in reset-password:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to reset password." },
       { status: 500 },

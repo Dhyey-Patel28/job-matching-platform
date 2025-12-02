@@ -18,56 +18,162 @@ enum ProfileMode {
   both
 }
 
+// --- New domain enums ---
+
+enum JobStatus {
+  draft
+  open
+  closed
+}
+
+enum MatchStatus {
+  active
+  interviewing
+  rejected
+  hired
+}
+
+// Keep your original swipe enums (used by existing code)
+
+enum SwipeDirection {
+  left
+  right
+}
+
+enum SwipeTargetType {
+  job
+  candidate
+}
+
+// --- Core models ---
+
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
+  id           String       @id @default(uuid())
+  email        String       @unique
   passwordHash String
   role         Role
   profileMode  ProfileMode
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime     @default(now())
+
+  // NEW
+  emailVerified Boolean     @default(false)
 
   candidateProfile    CandidateProfile?
   employerProfile     EmployerProfile?
   passwordResetTokens PasswordResetToken[]
-  swipes              Swipe[]
+
+  // NEW
+  emailVerificationTokens EmailVerificationToken[]
+
+  // Relations for domain pieces
+  swipes             Swipe[]
+  matchesAsCandidate Match[]  @relation("CandidateMatches")
+  matchesAsEmployer  Match[]  @relation("EmployerMatches")
+  messages           Message[]
 }
 
 model CandidateProfile {
-  userId String @id
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String @id
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   fullName  String?
   headline  String?
   location  String?
   interests String?
   resumeUrl String?
+
+  // Whether this candidate should show up in employer search / swipe decks.
+  openToWork Boolean @default(true)
 }
 
 model EmployerProfile {
-  userId String @id
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String @id
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   companyName String?
   roleTitle   String?
   location    String?
   website     String?
   hiringFor   String?
+
+  // High-level flag controlling whether this employer is actively hiring.
+  isHiring Boolean @default(true)
+
+  // Jobs posted by this employer.
+  jobs      Job[]
 }
 
-// Store job cards as JSON blobs for now.
-// We'll seed from sampleJobs on first GET /api/jobs.
-model JobListing {
+model EmailVerificationToken {
   id        String   @id @default(uuid())
-  payload   Json
-  createdAt DateTime @default(now())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
-// Store employer cards as JSON blobs for now.
-// We'll seed from sampleEmployers on first GET /api/employers.
-model EmployerListing {
+// --- Domain models for jobs, matches, and chat ---
+
+model Job {
+  id             String          @id @default(uuid())
+  employerUserId String
+  employer       EmployerProfile @relation(fields: [employerUserId], references: [userId], onDelete: Cascade)
+
+  title          String
+  description    String
+  location       String?
+  employmentType String?   // e.g. "Full-time"
+  remoteType     String?   // e.g. "Remote", "Hybrid"
+  tags           String[]  // stored as text[] in Postgres
+
+  status         JobStatus  @default(open)
+  isPublic       Boolean    @default(true)
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  matches        Match[]
+}
+
+model Match {
+  id          String      @id @default(uuid())
+  candidateId String
+  employerId  String
+  jobId       String
+  status      MatchStatus @default(active)
+  createdAt   DateTime    @default(now())
+
+  candidate   User @relation("CandidateMatches", fields: [candidateId], references: [id], onDelete: Cascade)
+  employer    User @relation("EmployerMatches", fields: [employerId], references: [id], onDelete: Cascade)
+  job         Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  conversations Conversation[]
+
+  @@unique([candidateId, employerId, jobId])
+}
+
+model Conversation {
   id        String   @id @default(uuid())
-  payload   Json
+  matchId   String   @unique
   createdAt DateTime @default(now())
+
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  messages  Message[]
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  body           String
+  createdAt      DateTime @default(now())
+  readAt         DateTime?
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
 
 model PasswordResetToken {
@@ -80,15 +186,7 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-enum SwipeDirection {
-  left
-  right
-}
-
-enum SwipeTargetType {
-  job
-  candidate
-}
+// --- Original swipe model (unchanged semantics) ---
 
 model Swipe {
   id         String          @id @default(uuid())
@@ -101,5 +199,4 @@ model Swipe {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, targetType, targetId])
-  @@index([userId, targetType, targetId])
 }

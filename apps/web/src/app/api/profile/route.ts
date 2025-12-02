@@ -1,6 +1,7 @@
 // apps/web/src/app/api/profile/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
+import { getSessionUser } from "@/server/auth";
 
 type ProfileMode = "candidate" | "employer" | "both";
 
@@ -64,21 +65,19 @@ function normalizeEmployer(
   };
 }
 
-// GET: load a specific user's profile by ?userId=...
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-
-  if (!userId) {
+// GET: load the logged-in user's profile (ignore ?userId=...)
+export async function GET() {
+  const session = await getSessionUser();
+  if (!session) {
     return NextResponse.json(
-      { ok: false, error: "userId is required." },
-      { status: 400 },
+      { ok: false, error: "Not authenticated." },
+      { status: 401 },
     );
   }
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: session.sub },
       include: {
         candidateProfile: true,
         employerProfile: true,
@@ -86,10 +85,7 @@ export async function GET(request: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({
-        ok: true,
-        profile: null,
-      });
+      return NextResponse.json({ ok: true, profile: null });
     }
 
     const profileMode = user.profileMode as ProfileMode;
@@ -113,10 +109,17 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: save a specific user's profile (userId is required)
+// POST: save logged-in user's profile (ignore userId in body)
 export async function POST(request: Request) {
-  let body: unknown;
+  const session = await getSessionUser();
+  if (!session) {
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated." },
+      { status: 401 },
+    );
+  }
 
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -126,56 +129,38 @@ export async function POST(request: Request) {
     );
   }
 
-  const { userId, profileMode, candidate, employer } = body as {
-    userId?: string;
+  const { profileMode, candidate, employer } = body as {
     profileMode?: string;
     candidate?: CandidateProfilePayload | null;
     employer?: EmployerProfilePayload | null;
   };
 
-  if (!userId) {
+  if (!profileMode) {
     return NextResponse.json(
-      { ok: false, error: "userId is required." },
-      { status: 400 },
-    );
-  }
-
-  const allowed: ProfileMode[] = ["candidate", "employer", "both"];
-
-  if (!profileMode || !allowed.includes(profileMode as ProfileMode)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "profileMode must be 'candidate', 'employer', or 'both'.",
-      },
+      { ok: false, error: "profileMode is required." },
       { status: 400 },
     );
   }
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: session.sub },
     });
 
     if (!user) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "No user found. Create an account before saving a profile.",
-        },
-        { status: 400 },
+        { ok: false, error: "User not found." },
+        { status: 404 },
       );
     }
 
     const mode = profileMode as ProfileMode;
 
-    // Update user's profileMode
     await prisma.user.update({
       where: { id: user.id },
       data: { profileMode: mode },
     });
 
-    // Candidate profile
     if (candidate) {
       await prisma.candidateProfile.upsert({
         where: { userId: user.id },
@@ -195,12 +180,8 @@ export async function POST(request: Request) {
           resumeUrl: candidate.resumeUrl || null,
         },
       });
-    } else {
-      // If candidate is null, clear it
-      await prisma.candidateProfile.deleteMany({ where: { userId: user.id } });
     }
 
-    // Employer profile
     if (employer) {
       await prisma.employerProfile.upsert({
         where: { userId: user.id },
@@ -220,24 +201,15 @@ export async function POST(request: Request) {
           hiringFor: employer.hiringFor || null,
         },
       });
-    } else {
-      await prisma.employerProfile.deleteMany({ where: { userId: user.id } });
     }
 
-    const updated = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        candidateProfile: true,
-        employerProfile: true,
-      },
-    });
-
-    const candidateOut = normalizeCandidate(updated?.candidateProfile);
-    const employerOut = normalizeEmployer(updated?.employerProfile);
+    // normalize output again
+    const candidateOut = candidate ? normalizeCandidate(candidate) : null;
+    const employerOut = employer ? normalizeEmployer(employer) : null;
 
     return NextResponse.json({
       ok: true,
-      message: "Profile saved to database.",
+      message: "Profile saved.",
       profile: {
         profileMode: mode,
         candidate: candidateOut,
@@ -247,11 +219,9 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("Error saving profile:", err);
     return NextResponse.json(
-      {
-        ok: false,
-        error: "Failed to save profile.",
-      },
+      { ok: false, error: "Failed to save profile." },
       { status: 500 },
     );
   }
 }
+

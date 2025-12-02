@@ -1,4 +1,3 @@
-// apps/web/src/app/forgot-password/page.tsx
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -33,7 +32,7 @@ export default function ForgotPasswordPage() {
       }
 
       setMessage(
-        "If an account exists for that email, you'll receive a reset link. (In dev, use the link below.)",
+        "If an account exists for that email, you'll receive a reset link shortly.",
       );
 
       if (data.resetUrl) {
@@ -52,10 +51,9 @@ export default function ForgotPasswordPage() {
       <AppBackground />
       <div className="grid min-h-screen place-items-center px-4">
         <div className="relative w-[min(500px,92vw)]">
-          {/* subtle halo (same as LoginPage) */}
           <div className="absolute -inset-2 rounded-3xl bg-white/10 blur-2xl" />
           <div className="relative rounded-3xl bg-white/10 p-8 backdrop-blur-xl ring-1 ring-white/20 shadow-[0_20px_60px_rgba(0,0,0,.25)]">
-            {/* Header brand row (copied from LoginPage for consistency) */}
+            {/* Brand row */}
             <div className="mb-6 flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xl font-black text-gray-900 shadow-sm">
                 J
@@ -73,7 +71,11 @@ export default function ForgotPasswordPage() {
               reset your password.
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+            <form
+              onSubmit={handleSubmit}
+              className="mt-6 space-y-4"
+              noValidate
+            >
               <div>
                 <label className="mb-1 block text-xs font-medium text-white/80">
                   Email
