@@ -3,9 +3,11 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { cookies } from "next/headers";
 import type { ProfileMode, Role } from "@prisma/client";
 
-// In dev we can fall back to a default secret if env is missing.
-// In prod you MUST set JWT_SECRET in your environment.
-const JWT_SECRET = process.env.JWT_SECRET || "dev-insecure-secret-do-not-use-in-prod";
+// JWT_SECRET is required in every environment. There is no fallback:
+// without it, sessions can be neither issued nor accepted (fail closed).
+function getJwtSecret(): string | null {
+  return process.env.JWT_SECRET || null;
+}
 
 export type SessionPayload = {
   sub: string; // userId
@@ -17,12 +19,27 @@ export type SessionPayload = {
 };
 
 export function signSession(payload: SessionPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+  const secret = getJwtSecret();
+  if (!secret) {
+    throw new Error("JWT_SECRET is not configured; refusing to sign session.");
+  }
+  return jwt.sign(payload, secret, { algorithm: "HS256", expiresIn: "7d" });
 }
 
 export function verifySession(token: string): SessionPayload | null {
+  const secret = getJwtSecret();
+  if (!secret) {
+    console.error("[auth] JWT_SECRET is not configured; rejecting session.");
+    return null;
+  }
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload | string;
+    const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] }) as
+      | JwtPayload
+      | string;
+    if (typeof decoded !== "object" || typeof decoded.sub !== "string") {
+      return null;
+    }
     return decoded as SessionPayload;
   } catch {
     return null;

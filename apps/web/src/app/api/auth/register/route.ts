@@ -85,8 +85,6 @@ export async function POST(req: Request) {
       process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
 
-    console.log("Email verification URL:", verifyUrl);
-
     // Send via Nodemailer (SMTP)
     await sendVerificationEmail(email, verifyUrl);
 
