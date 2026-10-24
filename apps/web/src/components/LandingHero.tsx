@@ -187,26 +187,47 @@ function AvatarRow() {
   );
 }
 
+function DemoBadge({ label = "Demo data" }: { label?: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/90 backdrop-blur"
+      title="Sample values for demo only"
+    >
+      {label}
+    </span>
+  );
+}
+
 /** Subtle, fluid hero stats */
 function HeroStats() {
-  // fun little ticker
   const [matches, setMatches] = useState(5123);
   useEffect(() => {
     const id = setInterval(() => setMatches((m) => m + Math.floor(Math.random() * 3)), 1600);
     return () => clearInterval(id);
   }, []);
+
   return (
-    <div className="mt-[min(2.2rem,3vh)] grid grid-cols-3 gap-[clamp(.6rem,1.2vw,1rem)] max-w-[60ch]">
-      {[
-        { label: "Open roles", value: "3,200+" },
-        { label: "Companies", value: "850+" },
-        { label: "Matches", value: Intl.NumberFormat().format(matches) },
-      ].map((s) => (
-        <div key={s.label} className="rounded-xl border border-white/25 bg-white/10 px-[clamp(.6rem,1vw,.9rem)] py-[clamp(.6rem,1vw,.9rem)] backdrop-blur">
-          <div className="text-white font-semibold text-[clamp(1rem,1.4vw,1.1rem)]">{s.value}</div>
-          <div className="text-white/80 text-[clamp(.7rem,.95vw,.82rem)]">{s.label}</div>
-        </div>
-      ))}
+    <div className="mt-[min(2.2rem,3vh)] max-w-[60ch]">
+      <div className="mb-2 flex items-center gap-2 text-xs text-white/80">
+        <DemoBadge label="Mock metrics" />
+        <span>Numbers shown are sample values for the demo UI.</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-[clamp(.6rem,1.2vw,1rem)]">
+        {[
+          { label: "Open roles", value: "3,200+" },
+          { label: "Companies", value: "850+" },
+          { label: "Matches", value: Intl.NumberFormat().format(matches) },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-white/25 bg-white/10 px-[clamp(.6rem,1vw,.9rem)] py-[clamp(.6rem,1vw,.9rem)] backdrop-blur"
+          >
+            <div className="text-white font-semibold text-[clamp(1rem,1.4vw,1.1rem)]">{s.value}</div>
+            <div className="text-white/80 text-[clamp(.7rem,.95vw,.82rem)]">{s.label}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

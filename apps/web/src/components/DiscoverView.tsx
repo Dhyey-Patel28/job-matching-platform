@@ -97,12 +97,14 @@ export default function DiscoverView({
           fetch("/api/candidates"),
         ]);
 
-        if (!jobsRes.ok || !candRes.ok) {
+        if (!jobsRes.ok) {
           throw new Error("Failed to fetch data");
         }
 
         const jobsJson = await jobsRes.json();
-        const candJson = await candRes.json();
+        // Candidates require an employer session; a failure here should
+        // only empty the candidate deck, not replace real jobs.
+        const candJson = candRes.ok ? await candRes.json() : { candidates: [] };
 
         if (cancelled) return;
 

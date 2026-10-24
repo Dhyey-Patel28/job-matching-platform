@@ -31,9 +31,9 @@ const transporter =
  */
 export async function sendVerificationEmail(to: string, verifyUrl: string) {
   if (!transporter) {
+    // Never log verifyUrl: it contains a single-use account token.
     console.warn(
-      "[email] SMTP credentials missing; skipping real email send. verifyUrl:",
-      verifyUrl,
+      "[email] SMTP credentials missing; verification email not sent.",
     );
     return;
   }
@@ -80,9 +80,9 @@ export async function sendVerificationEmail(to: string, verifyUrl: string) {
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   if (!transporter) {
+    // Never log resetUrl: it contains a single-use password reset token.
     console.warn(
-      "[email] SMTP credentials missing; skipping real reset email. resetUrl:",
-      resetUrl,
+      "[email] SMTP credentials missing; password reset email not sent.",
     );
     return;
   }

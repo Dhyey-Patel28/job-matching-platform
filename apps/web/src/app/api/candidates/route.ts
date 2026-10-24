@@ -2,39 +2,60 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { getSessionUser } from "@/server/auth";
-import type { Prisma } from "@prisma/client";
 import type { Candidate as CandidateCard } from "@/components/CandidateCard";
 
-export async function GET(req: Request) {
+export async function GET() {
+  const session = await getSessionUser();
+  if (!session) {
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated" },
+      { status: 401 },
+    );
+  }
+
   try {
-    const session = await getSessionUser();
-    const userId = session?.sub ?? null;
+    // Check the current account in the DB rather than trusting the token,
+    // so deleted users and stale profile modes don't get access.
+    const user = await prisma.user.findUnique({
+      where: { id: session.sub },
+      select: { id: true, role: true, profileMode: true },
+    });
 
-    // Only real candidates who are open to work
-    const globalWhere: Prisma.CandidateProfileWhereInput = {
-      openToWork: true,
-    };
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Not authenticated" },
+        { status: 401 },
+      );
+    }
 
-    // Discovery feed: hide myself if I’m also a candidate
-    const discoveryWhere: Prisma.CandidateProfileWhereInput = {
-      ...globalWhere,
-      ...(userId ? { userId: { not: userId } } : {}),
-    };
+    // Only employer accounts browse candidates; candidate-only users get an
+    // empty deck so the rest of Discover keeps working.
+    const canBrowseCandidates =
+      user.role === "recruiter" || user.profileMode !== "candidate";
+    if (!canBrowseCandidates) {
+      return NextResponse.json({ candidates: [] });
+    }
 
+    // Only candidates who are open to work, never myself
     const rows = await prisma.candidateProfile.findMany({
-      where: discoveryWhere,
-      include: { user: true },
+      where: { openToWork: true, userId: { not: user.id } },
+      select: {
+        userId: true,
+        fullName: true,
+        headline: true,
+        location: true,
+        interests: true,
+      },
       orderBy: { user: { createdAt: "desc" } },
     });
 
+    // Return only what the candidate card renders; no email-derived names.
     const candidates: CandidateCard[] = rows.map((row) => ({
       id: row.userId,
-      name: row.fullName || row.user.email.split("@")[0],
+      name: row.fullName || "Candidate",
       headline: row.headline ?? "",
       location: row.location ?? "Location flexible",
-      // CandidateCard.interests is `string | undefined`
       interests: row.interests ?? undefined,
-      openToWork: row.openToWork,
     }));
 
     return NextResponse.json({ candidates });
